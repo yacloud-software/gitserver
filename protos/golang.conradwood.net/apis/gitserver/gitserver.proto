@@ -1,0 +1,274 @@
+
+syntax = "proto3";
+
+package gitserver;
+option java_package = "net.conradwood.golang.apis.gitserver";
+import "golang.conradwood.net/apis/common/common.proto";
+import "golang.conradwood.net/apis/auth/auth.proto";
+
+enum REPOTAG {
+  UNDEFINED=0;
+  FIRMWARE=1;
+  LOADER=2;
+  FIRMWARE_APP=3;
+}
+
+message GitCredentials {
+  uint64 ID=1;
+  string UserID=2; // which user these creds belong to
+  string Host=3; // e.g. github.com
+  string Path=4; // currently ignored
+  string Username=5;
+  string Password=6;
+}
+
+message RepoTagRequest {
+  uint32 Tag=1; // very simple atm. Provide a single tag and it will return only repos with that Tag
+}
+// a log and statemachine in the database for creating repos
+message CreateRepoLog {
+  // database id
+  uint64 ID = 1;
+  // which repo does it refer to?
+  uint64 RepositoryID = 2;
+  // user who runs this (also in context)
+  string UserID = 3;
+  // serialised context
+  string Context = 4;
+  // defines what this 'logentry' does/did. See gitserver source for specifics
+  uint32 Action = 5;
+  // true if this succeeded
+  bool Success = 6;
+  // if !success, here's the error message
+  string ErrorMessage = 7;
+  uint32 Started = 8;           // when did this step start?
+  uint32 Finished = 9;          // when did this step complete?
+  string AssociationToken = 10; // a semi random text to associate GIT/URL Access with create log. Once finished, this token should not be reused
+}
+
+message Build {
+  uint64 ID = 1;
+  uint64 RepositoryID = 2;
+  string CommitHash = 3;
+  string Branch = 4;
+  string LogMessage = 5;
+  string UserID = 6;
+  uint32 Timestamp = 7;
+  bool Success = 8;
+}
+message BuildList {
+  repeated Build Builds=1;
+}
+message RepositoryList {
+  repeated Repository Repos = 1; // list of repos
+}
+message Permission {
+  bool Read = 1;    // can get the sourcecode
+  bool Write = 2;   // can make patches, submit code
+  bool Execute = 3; // can authorize others
+  bool List = 4;    // can view this repo (*any* other permission implies this one)
+}
+/*
+A "watcher" is someone who watches pushes to a given repository.
+Note that pushes by "oneself" will not be notified.
+Otherwise each push will be send via slack
+ */
+message Watchers {
+  uint64 ID = 1;
+  string UserID = 2;
+  uint64 RepositoryID = 3;
+  uint32 Notifytype = 4;
+}
+
+message Repository {
+  uint64 ID = 1;
+  string RepoName = 2;       // repo name
+  string OwnerID = 3;        // owner of the repo
+  string ArtefactName = 4;   // name of artefact in buildrepo (often same as reponame, except for users and/or duplicates)
+  Permission Permission = 5; // permissions of the caller
+}
+
+message GroupRepositoryAccess {
+  uint64 ID = 1;
+  uint64 RepoID = 2;
+  string GroupID = 3;
+  bool Read = 4;
+  bool Write = 5;
+}
+message UserRepositoryAccess {
+  uint64 ID = 1;
+  uint64 RepoID = 2;
+  string UserID = 3;
+  bool Read = 4;
+  bool Write = 5;
+}
+message PostReceiveRequest {
+  string RepoDirectory = 1;
+  string Ref = 2;
+  string OldRevision = 3;
+  string NewRevision = 4;
+}
+message PostReceiveStream {
+}
+message ByIDRequest {
+  uint64 ID = 1;
+}
+message ByURLRequest {
+  string URL = 1;
+}
+message RepositoryInfo {
+  Repository Repository = 1;
+}
+
+// this message is passed through the CGI as environment variable back to the builder
+message GitInfo {
+  uint64 RepositoryID = 1;
+  string UserID = 2;
+  auth.User User = 3;
+  uint32 Version = 4; // either 0 (very old), 1 for V1 or V2
+}
+message CreateRepoRequest {
+  string ArtefactName = 1;
+  SourceRepositoryURL URL = 2; // at least one is required
+  string Description = 3;      // a description for this repository
+}
+
+// stored in database. Maps a URL to a filepath and a unique ID
+message SourceRepository {
+  uint64 ID = 1;       // database sequence ID
+  string FilePath = 2; // full, relative path under gitroot, e.g. byid/[ID].git
+  repeated SourceRepositoryURL URLs = 3;
+  string ArtefactName = 4; // globally unique artefactName
+  // if true: run the post-receive hook
+  bool RunPostReceive = 5;
+  // if true: run the pre-receive hook
+  bool RunPreReceive = 6;
+  bool CreatedComplete = 7; // if false, access is limited to repobuilder
+  string Description = 8;   // a description for this repository
+  uint64 UserCommits = 9;   // number of commits by users (non-repobuilder)
+  bool Deleted=10; // true if this is deleted
+  uint32 DeletedTimestamp=11; //timestamp when this was deleted (garbage collect later)
+  string DeleteUser=12; // userid of user who deleted it
+  uint32 LastCommit=13; // timestamp last commit (should match buildlog)
+  string LastCommitUser=14; // last user commit (should match buildlog)
+  uint32 Tags=15; // some repos are 'special'. see enum REPOTAGS
+  bool Forking=16; // true whilst forking
+  uint64 ForkedFrom=17; // if 0: not forked, otherwise original repo id
+}
+// the URL a given repository can be accessed under.
+// Note: Repositories may be accessed under multiple different URLs
+message SourceRepositoryURL {
+  uint64 ID = 1; // database sequence ID
+  // the Repository we're referring to on disk
+  uint64 V2RepositoryID = 2;
+  // which Host do we expose this on, e.g. "git.singingcat.net"
+  string Host = 3;
+  // which path do we expose this on, e.g. "/git/foobar.git"
+  string Path = 4;
+}
+message SourceRepositoryList {
+  repeated SourceRepository Repos = 1; // list of repos
+}
+/*
+service OLDGIT {
+  // deprecated and obsolete: get a repo by ID
+  rpc RepoByID(ByIDRequest) returns (RepositoryInfo);
+  // deprecated and obsolete: called by git post receive hook
+  rpc PostReceive(PostReceiveRequest) returns (stream PostReceiveStream);
+  //  deprecated and obsolete: get all repos we got access to
+  rpc GetRepos(common.Void) returns (RepositoryList);
+  //  deprecated and obsolete: we sometimes hit it badly...
+  rpc GetCPULoad(common.Void) returns (common.CPULoad);
+  //  deprecated and obsolete: fork a repo, returns ID of new repo
+  rpc Fork(ByIDRequest) returns (Repository);
+}
+*/
+message SetRepoFlagsRequest {
+  uint64 RepoID = 1;
+  bool RunPostReceive = 2;
+  bool RunPreReceive = 3;
+}
+message ForkRequest {
+  uint64 RepositoryID=1; // the one to fork
+  string ArtefactName =2;
+  SourceRepositoryURL URL=3; // the new URL
+  string Description =4;
+}
+message PingState {
+  uint64 ID=1;
+  string AssociationToken=2; // sent to the server
+  uint32 Created=3;
+  string ResponseToken=4; // returned by the server
+}
+message CheckGitRequest {
+  string Host=1;
+}
+message CheckGitResponse {
+  bool Success=1; // true if we found a git server at host
+}
+message RepoFilter {
+  RepoTagRequest Tags=1;
+}
+
+/*
+ a new implementation of git server
+ Major Differences to GIT1:
+ * supports multiple repositories of same name
+ * globally unique IDs for each repository
+ * uses objectauth instead of its own method for ACL
+ * supports domains in paths, e.g. "yacloud.eu/git/frei-services.com/csf"
+ * streaming responses so to provide 'live' feedback whilst committing
+ * support commit  plugins (e.g. gerrit)
+ * a 'repo path' must end with ".git". it will be automatically appended if necessary.
+*/
+service GIT2 {
+  // check if there is a git server listening on that host
+  rpc CheckGitServer(CheckGitRequest) returns (CheckGitResponse);
+  // get a repo by ID
+  rpc RepoByID(ByIDRequest) returns (SourceRepository);
+  // get a repo by URL
+  rpc RepoByURL(ByURLRequest) returns(SourceRepository);
+  // fork a repo, returns ID of new repo
+  rpc Fork(ForkRequest) returns (SourceRepository);
+  // get all repos current user got access to. (Note: This is a global list, no longer "per gitserver"
+  rpc GetRepos(common.Void) returns (SourceRepositoryList);
+  // create a new bare git repo 
+  rpc CreateRepo(CreateRepoRequest) returns (SourceRepository);
+  rpc SetRepoFlags(SetRepoFlagsRequest) returns (common.Void);
+  // mark this repository as complete. This is limited to repobuilder only
+  rpc RepoBuilderComplete(ByIDRequest) returns (common.Void);
+  // reset this repository.  This is limited to repobuilder only and specific repositories. It serves to re-use test repositories. It resets the contents to
+  // "bare" (but not the URL)
+  rpc ResetRepository(ByIDRequest) returns (common.Void);
+  // delete a repository. it'll be gone thereafter
+  rpc DeleteRepository(ByIDRequest) returns (common.Void);
+  // get repos with specific flags
+  rpc GetReposTags(RepoTagRequest) returns (SourceRepositoryList);
+  // get recent builds
+  rpc GetRecentBuilds(ByIDRequest) returns (BuildList);
+  // get most recent build
+  rpc GetLatestBuild(ByIDRequest) returns (Build);
+}
+
+
+
+/*********************************
+git credentials
+*********************************/
+
+message GitCredentialsRequest {
+  repeated string Args=1;
+  repeated string Environment=2;
+  string Stdin=3;
+}
+message GitCredentialsResponse {
+  string Stdout=1;
+}
+/*
+ * for testing git credentials stuff
+*/
+service GITCredentials {
+  // called by client if git calls it
+  rpc GitInvoked(GitCredentialsRequest) returns (GitCredentialsResponse);
+
+}
