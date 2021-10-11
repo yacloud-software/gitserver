@@ -1,6 +1,6 @@
 // client create: GIT2Client
 /* geninfo:
-   filename  : protos/golang.conradwood.net/apis/gitserver/gitserver.proto
+   filename  : golang.conradwood.net/apis/gitserver/gitserver.proto
    gopackage : golang.conradwood.net/apis/gitserver
    importname: ai_0
    varname   : client_GIT2Client_0
