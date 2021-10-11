@@ -50,7 +50,7 @@ func GetAuth(ctx context.Context, stdin string) (string, error) {
 	_, ourhost, err := query.SendPing(ctx, hostname)
 	if err != nil {
 		fmt.Printf("Ping failed (%s)\n", err)
-		return "", err
+		ourhost = false
 	}
 	if !ourhost {
 		// do not send tokens to hosts other than us
