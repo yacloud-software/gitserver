@@ -20,6 +20,9 @@ const (
 )
 
 func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
+	if !utils.FileExists(gitbin) {
+		panic(fmt.Sprintf("Git http backend missing (%s)", gitbin))
+	}
 	var err error
 	// create a new 'fake' request for the cgihandler
 	// with the path adjusted to match the filesystem (rather than URL)
