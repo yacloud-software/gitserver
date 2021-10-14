@@ -135,7 +135,9 @@ func (c *cgiResponseWriter) Header() http.Header {
 	return c.h.w.Header()
 }
 func (c *cgiResponseWriter) Write(buf []byte) (int, error) {
-	//	fmt.Printf("cgi said: %s\n", string(buf))
+	if *debug {
+		fmt.Printf("cgi said: %s\n", string(buf))
+	}
 	n, err := c.h.w.Write(buf)
 	if err != nil {
 		return n, err
