@@ -2,7 +2,6 @@ package builder
 
 import (
 	"context"
-	"flag"
 	"golang.conradwood.net/coderunners"
 	"golang.conradwood.net/coderunners/registry"
 	//	"encoding/base64"
@@ -46,7 +45,6 @@ const (
 )
 
 var (
-	run_scripts   = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 	BUILD_SCRIPTS = map[string]string{
 		"STANDARD_PROTOS": "protos-build.sh",
 		"STANDARD_GO":     "go-build.sh",
@@ -222,9 +220,6 @@ func (b *Builder) BuildGit(ctx context.Context) error {
 
 	fmt.Printf("Configured/Detected Build types: %s\n", b.buildrules.Builds)
 	target_os := strings.Join(b.buildrules.TargetGoOS(), " ")
-	if !*run_scripts {
-		return nil
-	}
 	err = b.buildscript(ctx, script("clean-build.sh"), target_os)
 	if err != nil {
 		return err

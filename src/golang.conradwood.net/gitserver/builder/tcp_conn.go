@@ -2,11 +2,16 @@ package builder
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"golang.conradwood.net/gitserver/git"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/utils"
 	"net"
+)
+
+var (
+	run_scripts = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 )
 
 type TCPConn struct {
@@ -44,6 +49,10 @@ func (t *TCPConn) HandleConnection() {
 
 // e.g. ref== 'master', newrev == commitid
 func (t *TCPConn) build(gt *GitTrigger) error {
+	if !*run_scripts {
+		t.Writeln("Builds disabled.\n")
+		return nil
+	}
 	t.Writeln(fmt.Sprintf("Building %s, commit %s on %s", gt.ref, gt.repodir, gt.newrev))
 	ctx, err := gt.GetContext()
 	if err != nil {
