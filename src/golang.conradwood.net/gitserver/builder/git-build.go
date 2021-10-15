@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"flag"
 	"golang.conradwood.net/coderunners"
 	"golang.conradwood.net/coderunners/registry"
 	//	"encoding/base64"
@@ -45,6 +46,7 @@ const (
 )
 
 var (
+	run_scripts   = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 	BUILD_SCRIPTS = map[string]string{
 		"STANDARD_PROTOS": "protos-build.sh",
 		"STANDARD_GO":     "go-build.sh",
@@ -220,6 +222,9 @@ func (b *Builder) BuildGit(ctx context.Context) error {
 
 	fmt.Printf("Configured/Detected Build types: %s\n", b.buildrules.Builds)
 	target_os := strings.Join(b.buildrules.TargetGoOS(), " ")
+	if !*run_scripts {
+		return nil
+	}
 	err = b.buildscript(ctx, script("clean-build.sh"), target_os)
 	if err != nil {
 		return err
@@ -253,33 +258,6 @@ func (b *Builder) BuildGit(ctx context.Context) error {
 		}
 	}
 
-	// part of script config BUILD_SCRIPTS now
-	/*
-			if b.buildrules.GoBuild() {
-				err = b.buildscript(ctx, script("go-build.sh"), target_os)
-				if err != nil {
-					return err
-				}
-			}
-			if b.buildrules.JavaBuild() {
-				err = b.buildscript(ctx, script("java-build.sh"), target_os)
-				if err != nil {
-					return err
-				}
-			}
-			if b.buildrules.KicadBuild() {
-				err = b.buildscript(ctx, script("kicad-build.sh"), target_os)
-				if err != nil {
-					return err
-				}
-			}
-		if b.buildrules.ProtosBuild() {
-			err = b.buildscript(ctx, script("protos-build.sh"), target_os)
-			if err != nil {
-				return err
-			}
-		}
-	*/
 	// ** now create the dist and upload it
 	err = b.buildscript(ctx, script("dist.sh"), target_os)
 	if err != nil {
