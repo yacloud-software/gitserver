@@ -532,7 +532,7 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 		return nil, err
 	}
 	if len(builds) == 0 {
-		return nil, errors.NotFound(ctx, "no build for repo", "no build for repo")
+		return nil, errors.NotFound(ctx, "no build for repo %d", req.ID)
 	}
 	return builds[0], nil
 }
