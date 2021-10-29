@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"golang.conradwood.net/apis/gitbuilder"
 	"golang.conradwood.net/gitserver/git"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/utils"
+	"io"
 	"net"
 )
 
 var (
-	run_scripts = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
+	use_external_builder = flag.Bool("use_external_builder", false, "if true, the external builder will be used")
+	run_scripts          = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 )
 
 type TCPConn struct {
@@ -25,6 +28,10 @@ func NewTCPConn(c net.Conn) *TCPConn {
 func (t *TCPConn) Writeln(s string) {
 	fmt.Println(s)
 	t.conn.Write([]byte(s + "\n"))
+}
+func (t *TCPConn) Write(s []byte) {
+	fmt.Print(string(s))
+	t.conn.Write(s)
 }
 func (t *TCPConn) HandleConnection() {
 	defer t.conn.Close()
@@ -41,14 +48,55 @@ func (t *TCPConn) HandleConnection() {
 		t.Printf("Failed to parse git trigger: %s\n", utils.ErrorString(err))
 		return
 	}
-	err = t.build(gt)
+	if *use_external_builder {
+		err = t.external_builder(gt)
+	} else {
+		err = t.build(gt)
+	}
 	if err != nil {
 		t.Writeln(fmt.Sprintf("Failed to build: %s", err))
 	}
 }
 
+// use the gitbuilder service to build instead of locally forking it off
+// e.g. ref== 'master', newrev == commitid
+func (t *TCPConn) external_builder(gt *GitTrigger) error {
+	ctx, err := gt.GetContext()
+	if err != nil {
+		return err
+	}
+	gb := gitbuilder.GetGitBuilderClient()
+	br := &gitbuilder.BuildRequest{}
+	cl, err := gb.Build(ctx, br)
+	if err != nil {
+		return err
+	}
+	var lastResponse *gitbuilder.BuildResponse
+	for {
+		res, err := cl.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if res.Complete {
+			lastResponse = res
+		}
+		if len(res.Stdout) != 0 {
+			t.Write(res.Stdout)
+		}
+	}
+	if !lastResponse.Success {
+		return fmt.Errorf("build failed (%s)", lastResponse.ResultMessage)
+	}
+	return nil
+}
+
+// run scripts directly within git-server host (forking off scripts)
 // e.g. ref== 'master', newrev == commitid
 func (t *TCPConn) build(gt *GitTrigger) error {
+
 	if !*run_scripts {
 		t.Writeln("Builds disabled.\n")
 		return nil
