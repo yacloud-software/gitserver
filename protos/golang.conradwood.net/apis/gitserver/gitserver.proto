@@ -126,6 +126,7 @@ message GitInfo {
   string UserID = 2;
   auth.User User = 3;
   uint32 Version = 4; // either 0 (very old), 1 for V1 or V2
+  string URL=5; // the url used to access this repo
 }
 message CreateRepoRequest {
   string ArtefactName = 1;
