@@ -66,7 +66,10 @@ func (t *TCPConn) external_builder(gt *GitTrigger) error {
 		return err
 	}
 	gb := gitbuilder.GetGitBuilderClient()
-	br := &gitbuilder.BuildRequest{}
+	br := &gitbuilder.BuildRequest{
+		GitURL:   gt.gitinfo.URL,
+		CommitID: gt.newrev,
+	}
 	cl, err := gb.Build(ctx, br)
 	if err != nil {
 		return err

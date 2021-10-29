@@ -77,7 +77,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 	// set up the environment for the cgi
 
 	// the gitinfo which is passed through back to us through the hooks
-	gi := &pb.GitInfo{Version: 2, RepositoryID: h.repo.gitrepo.ID, UserID: h.user.ID, User: h.user}
+	gi := &pb.GitInfo{Version: 2, RepositoryID: h.repo.gitrepo.ID, UserID: h.user.ID, User: h.user, URL: h.r.URL.String()}
 	gp, err := utils.Marshal(gi)
 	if err != nil {
 		h.Error(err)
