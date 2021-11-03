@@ -409,10 +409,11 @@ func (g *GIT2) ResetRepository(ctx context.Context, req *gitpb.ByIDRequest) (*co
 		return nil, err
 	}
 	body := string(hb.Body())
-	fmt.Printf("Resetted repo at %s: (%s)\n", url, body)
 	if !strings.Contains(body, r) {
+		fmt.Printf("Did not reset repo at %s: (%s)\n", url, body)
 		return nil, fmt.Errorf("failed to recreate: not a gitserver reply")
 	}
+	fmt.Printf("Resetted repo at %s\n", url)
 	return &common.Void{}, nil
 }
 func (g *GIT2) DeleteRepository(ctx context.Context, req *gitpb.ByIDRequest) (*common.Void, error) {
