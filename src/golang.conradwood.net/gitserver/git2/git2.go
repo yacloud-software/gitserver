@@ -301,6 +301,12 @@ func (h *HTTPRequest) setUser() bool {
 	return true
 }
 
+// if all goes well send this response and repeat the header "X-PleaseRepeatBack"
+func (g *HTTPRequest) Respond(txt string) {
+	s := g.SingleHeader(REPEAT_BACK_HEADER)
+	r := txt + " " + s
+	g.Write([]byte(r))
+}
 func (g *HTTPRequest) Write(b []byte) {
 	g.w.Write(b)
 }

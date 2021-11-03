@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+const (
+	REPEAT_BACK_HEADER = "X-PleaseRepeatBack"
+)
+
 func (h *HTTPRequest) RecreateRepo() {
 	fmt.Printf("Requested (via http) to reset repository\n")
 	crp, err := h.GetCreateLog()
@@ -50,6 +54,7 @@ func (h *HTTPRequest) RecreateRepo() {
 		h.Error(err)
 		return
 	}
+	h.Respond("Repo created")
 	fmt.Printf("Repo recreated\n")
 
 }
