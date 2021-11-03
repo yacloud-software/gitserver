@@ -6,9 +6,6 @@ export DISTDIR=`pwd`/dist
 export GOPATH=`pwd`
 echo "GOPATH=$GOPATH"
 
-# until we got a good way of handling modules:
-export GO111MODULE=off
-
 # space seperated packages
 if [ -d src ]; then
     DIRS=`ls -1 src/`
