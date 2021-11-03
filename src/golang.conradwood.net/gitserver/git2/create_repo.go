@@ -13,6 +13,7 @@ import (
 )
 
 func (h *HTTPRequest) RecreateRepo() {
+	fmt.Printf("Requested (via http) to reset repository\n")
 	crp, err := h.GetCreateLog()
 	if err != nil {
 		h.Error(err)
@@ -37,6 +38,7 @@ func (h *HTTPRequest) RecreateRepo() {
 	os.RemoveAll(td)
 	_, err = h.CreateRepoWithError(false)
 	if err != nil {
+		fmt.Printf("Failed to create repo: %s\n", err)
 		h.Error(err)
 		return
 	}
@@ -48,6 +50,7 @@ func (h *HTTPRequest) RecreateRepo() {
 		h.Error(err)
 		return
 	}
+	fmt.Printf("Repo recreated\n")
 
 }
 func (h *HTTPRequest) CreateRepo() {
@@ -126,8 +129,10 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 			fmt.Printf("failed to load source repository: %s\n", err)
 			return crp, err
 		}
+		fmt.Printf("Copying \"%s\" source...\n", src)
 		copyrepo(src, h.repo.gitrepo)
 	} else {
+		fmt.Printf("Running git --bare init in \"%s\"\n", td)
 		l := linux.New()
 		out, err := l.SafelyExecuteWithDir([]string{"git", "--bare", "init"}, td, nil)
 		if err != nil {
@@ -135,6 +140,7 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 			return nil, fmt.Errorf("failed to init git repository")
 		}
 	}
+	fmt.Printf("Repo created\n")
 	return crp, nil
 }
 
