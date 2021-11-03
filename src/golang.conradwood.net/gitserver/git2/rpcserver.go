@@ -406,7 +406,7 @@ func (g *GIT2) ResetRepository(ctx context.Context, req *gitpb.ByIDRequest) (*co
 		fmt.Printf("HTTP-Recreate request failed: %s\n", utils.ErrorString(err))
 		return nil, err
 	}
-	fmt.Printf("Resetted repo (%s)\n", string(hb.Body()))
+	fmt.Printf("Resetted repo at %s: (%s)\n", url, string(hb.Body()))
 	return &common.Void{}, nil
 }
 func (g *GIT2) DeleteRepository(ctx context.Context, req *gitpb.ByIDRequest) (*common.Void, error) {
