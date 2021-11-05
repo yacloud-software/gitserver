@@ -1,6 +1,6 @@
 // client create: GITCredentialsClient
 /* geninfo:
-   filename  : protos/golang.conradwood.net/apis/gitserver/gitserver.proto
+   filename  : golang.conradwood.net/apis/gitserver/gitserver.proto
    gopackage : golang.conradwood.net/apis/gitserver
    importname: ai_1
    varname   : client_GITCredentialsClient_1

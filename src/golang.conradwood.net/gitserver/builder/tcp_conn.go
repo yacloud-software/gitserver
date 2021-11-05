@@ -65,10 +65,15 @@ func (t *TCPConn) external_builder(gt *GitTrigger) error {
 	if err != nil {
 		return err
 	}
+	gi := gt.gitinfo
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
-		GitURL:   gt.gitinfo.URL,
-		CommitID: gt.newrev,
+		GitURL:       gt.gitinfo.URL,
+		CommitID:     gt.newrev,
+		BuildNumber:  0,
+		RepositoryID: gi.RepositoryID,
+		RepoName:     "",
+		ArtefactName: "",
 	}
 	cl, err := gb.Build(ctx, br)
 	if err != nil {
