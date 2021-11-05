@@ -4,11 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"golang.conradwood.net/apis/gitbuilder"
 	"golang.conradwood.net/gitserver/git"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/utils"
-	"io"
 	"net"
 )
 
@@ -29,9 +27,10 @@ func (t *TCPConn) Writeln(s string) {
 	fmt.Println(s)
 	t.conn.Write([]byte(s + "\n"))
 }
-func (t *TCPConn) Write(s []byte) {
+func (t *TCPConn) Write(s []byte) (int, error) {
 	fmt.Print(string(s))
 	t.conn.Write(s)
+	return len(s), nil
 }
 func (t *TCPConn) HandleConnection() {
 	defer t.conn.Close()
@@ -49,56 +48,13 @@ func (t *TCPConn) HandleConnection() {
 		return
 	}
 	if *use_external_builder {
-		err = t.external_builder(gt)
+		err = external_builder(gt, t)
 	} else {
 		err = t.build(gt)
 	}
 	if err != nil {
 		t.Writeln(fmt.Sprintf("Failed to build: %s", err))
 	}
-}
-
-// use the gitbuilder service to build instead of locally forking it off
-// e.g. ref== 'master', newrev == commitid
-func (t *TCPConn) external_builder(gt *GitTrigger) error {
-	ctx, err := gt.GetContext()
-	if err != nil {
-		return err
-	}
-	gi := gt.gitinfo
-	gb := gitbuilder.GetGitBuilderClient()
-	br := &gitbuilder.BuildRequest{
-		GitURL:       gt.gitinfo.URL,
-		CommitID:     gt.newrev,
-		BuildNumber:  0,
-		RepositoryID: gi.RepositoryID,
-		RepoName:     "",
-		ArtefactName: "",
-	}
-	cl, err := gb.Build(ctx, br)
-	if err != nil {
-		return err
-	}
-	var lastResponse *gitbuilder.BuildResponse
-	for {
-		res, err := cl.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		if res.Complete {
-			lastResponse = res
-		}
-		if len(res.Stdout) != 0 {
-			t.Write(res.Stdout)
-		}
-	}
-	if !lastResponse.Success {
-		return fmt.Errorf("build failed (%s)", lastResponse.ResultMessage)
-	}
-	return nil
 }
 
 // run scripts directly within git-server host (forking off scripts)
