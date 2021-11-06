@@ -31,7 +31,7 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 		RepositoryID: gi.RepositoryID,
 		CommitHash:   gt.newrev,
 		Branch:       gt.Branch(),
-		LogMessage:   "logmessage unavailable",
+		LogMessage:   "logmessage unavailable", // to get the logmessage we have to check the repo out
 		Timestamp:    uint32(time.Now().Unix()),
 	}
 
