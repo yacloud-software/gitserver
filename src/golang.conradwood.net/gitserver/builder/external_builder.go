@@ -87,13 +87,18 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 			}
 		}
 	}
-	if lastResponse != nil && lastResponse.LogMessage != "" {
+
+	if lastResponse == nil {
+		fmt.Printf("No final response from gitbuilder received. build information might be incomplete\n")
+	} else if lastResponse != nil {
+		nb.Success = lastResponse.Success
 		nb.LogMessage = lastResponse.LogMessage
 		err := bdb.Update(ctx, nb)
 		if err != nil {
 			fmt.Printf("Failed to set logmessage: %s\n", err)
 		}
 	}
+
 	if lastResponse == nil || !lastResponse.Success {
 		return fmt.Errorf("build failed (%s)", lastResponse.ResultMessage)
 	}
