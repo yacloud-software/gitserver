@@ -41,7 +41,8 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 		return err
 	}
 
-	repo, err := db.NewDBSourceRepository(psql).ByID(ctx, gi.RepositoryID)
+	repodb := db.NewDBSourceRepository(psql)
+	repo, err := repodb.ByID(ctx, gi.RepositoryID)
 	if err != nil {
 		return err
 	}
@@ -84,6 +85,13 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+	if lastResponse != nil && lastResponse.LogMessage != "" {
+		nb.LogMessage = lastResponse.LogMessage
+		err := bdb.Update(ctx, nb)
+		if err != nil {
+			fmt.Printf("Failed to set logmessage: %s\n", err)
 		}
 	}
 	if lastResponse == nil || !lastResponse.Success {
