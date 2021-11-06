@@ -86,7 +86,7 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 			}
 		}
 	}
-	if !lastResponse.Success {
+	if lastResponse == nil || !lastResponse.Success {
 		return fmt.Errorf("build failed (%s)", lastResponse.ResultMessage)
 	}
 	return nil
