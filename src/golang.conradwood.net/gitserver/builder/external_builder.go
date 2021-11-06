@@ -45,10 +45,18 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	urls, err := db.NewDBSourceRepositoryURL(psql).ByV2RepositoryID(ctx, gi.RepositoryID)
+	if err != nil {
+		return err
+	}
+	if len(urls) == 0 {
+		return fmt.Errorf("Repository %d (%s) has no urls\n", repo.ID, repo.ArtefactName)
+	}
+	url := fmt.Sprintf("https://%s/git/%s", urls[0].Host, urls[0].Path)
 
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
-		GitURL:       gt.gitinfo.URL,
+		GitURL:       url,
 		CommitID:     gt.newrev,
 		BuildNumber:  id,
 		RepositoryID: gi.RepositoryID,
