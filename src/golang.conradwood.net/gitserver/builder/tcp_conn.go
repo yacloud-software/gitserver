@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	use_external_builder = flag.Bool("use_external_builder", false, "if true, the external builder will be used")
+	use_external_builder = flag.Bool("use_external_builder", true, "if true, the external builder will be used")
 	run_scripts          = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 )
 
