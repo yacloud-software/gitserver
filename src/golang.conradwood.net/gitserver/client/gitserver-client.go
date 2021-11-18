@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	desc        = flag.String("desc", "", "description of new repo")
 	delete      = flag.Bool("delete", false, "delete repo")
 	print_repos = flag.Bool("print_repos", false, "print repositories")
 	fork        = flag.Bool("fork", false, "fork a repo")
@@ -119,7 +120,7 @@ func Create() {
 	}
 	path := fmt.Sprintf("%s/%s.git", u.Abbrev, *aname)
 	url := &pb.SourceRepositoryURL{Host: "git.conradwood.net", Path: path}
-	fr := &pb.CreateRepoRequest{ArtefactName: *aname, URL: url}
+	fr := &pb.CreateRepoRequest{ArtefactName: *aname, URL: url, Description: *desc}
 	rl, err := pb.GetGIT2Client().CreateRepo(ctx, fr)
 	utils.Bail("Failed to create repo", err)
 	fmt.Printf("Created repository: %d at https://%s/%s\n", rl.ID, url.Host, url.Path)
