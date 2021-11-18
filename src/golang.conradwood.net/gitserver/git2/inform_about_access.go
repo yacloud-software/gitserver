@@ -12,7 +12,7 @@ func (h *HTTPRequest) informAdminsAboutCommit() {
 	s := "<no user>"
 	if u != nil {
 		s = fmt.Sprintf("User %s [%s]", u.Email, u.ID)
-		if u.ID == "1" || u.ID == "7" {
+		if u.ID == "1" || u.ID == "7" || u.ID == "3539" {
 			fmt.Printf("No admin message, because userid == %s\n", u.ID)
 			return
 		}
