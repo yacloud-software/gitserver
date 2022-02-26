@@ -76,7 +76,7 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 		rm[repo.BuildRoutingTagName] = repo.BuildRoutingTagValue
 	} else {
 		if *def_routing {
-			rm["default"] = "true"
+			rm["provides"] = "default"
 		}
 	}
 	ctx = authremote.DerivedContextWithRouting(ctx, rm)
