@@ -41,6 +41,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBCreateRepoLog *DBCreateRepoLog
 )
 
 type DBCreateRepoLog struct {
@@ -49,6 +54,25 @@ type DBCreateRepoLog struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBCreateRepoLog() *DBCreateRepoLog {
+	if default_def_DBCreateRepoLog != nil {
+		return default_def_DBCreateRepoLog
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBCreateRepoLog(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBCreateRepoLog = res
+	return res
+}
 func NewDBCreateRepoLog(db *sql.DB) *DBCreateRepoLog {
 	foo := DBCreateRepoLog{DB: db}
 	foo.SQLTablename = "createrepolog"
@@ -130,10 +154,10 @@ func (a *DBCreateRepoLog) ByID(ctx context.Context, p uint64) (*savepb.CreateRep
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No CreateRepoLog with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No CreateRepoLog with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) CreateRepoLog with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) CreateRepoLog with id %v", len(l), p))
 	}
 	return l[0], nil
 }

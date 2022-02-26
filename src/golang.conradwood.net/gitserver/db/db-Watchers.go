@@ -35,6 +35,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBWatchers *DBWatchers
 )
 
 type DBWatchers struct {
@@ -43,6 +48,25 @@ type DBWatchers struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBWatchers() *DBWatchers {
+	if default_def_DBWatchers != nil {
+		return default_def_DBWatchers
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBWatchers(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBWatchers = res
+	return res
+}
 func NewDBWatchers(db *sql.DB) *DBWatchers {
 	foo := DBWatchers{DB: db}
 	foo.SQLTablename = "watchers"
@@ -124,10 +148,10 @@ func (a *DBWatchers) ByID(ctx context.Context, p uint64) (*savepb.Watchers, erro
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No Watchers with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No Watchers with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Watchers with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Watchers with id %v", len(l), p))
 	}
 	return l[0], nil
 }

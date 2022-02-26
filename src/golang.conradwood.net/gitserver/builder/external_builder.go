@@ -6,6 +6,7 @@ import (
 	"golang.conradwood.net/apis/gitbuilder"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
+	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/sql"
 	"io"
 	"time"
@@ -63,6 +64,11 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 		RepositoryID: gi.RepositoryID,
 		RepoName:     repo.ArtefactName,
 		ArtefactName: repo.ArtefactName,
+	}
+	// might have to add special routing tags to context to route it to a SPECIFIC builder
+	if repo.BuildRoutingTagName != "" && repo.BuildRoutingTagValue != "" {
+		rm := map[string]string{repo.BuildRoutingTagName: repo.BuildRoutingTagValue}
+		ctx = authremote.DerivedContextWithRouting(ctx, rm)
 	}
 	cl, err := gb.Build(ctx, br)
 	if err != nil {

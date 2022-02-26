@@ -36,6 +36,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBGroupRepositoryAccess *DBGroupRepositoryAccess
 )
 
 type DBGroupRepositoryAccess struct {
@@ -44,6 +49,25 @@ type DBGroupRepositoryAccess struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBGroupRepositoryAccess() *DBGroupRepositoryAccess {
+	if default_def_DBGroupRepositoryAccess != nil {
+		return default_def_DBGroupRepositoryAccess
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBGroupRepositoryAccess(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBGroupRepositoryAccess = res
+	return res
+}
 func NewDBGroupRepositoryAccess(db *sql.DB) *DBGroupRepositoryAccess {
 	foo := DBGroupRepositoryAccess{DB: db}
 	foo.SQLTablename = "grouprepositoryaccess"
@@ -125,10 +149,10 @@ func (a *DBGroupRepositoryAccess) ByID(ctx context.Context, p uint64) (*savepb.G
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No GroupRepositoryAccess with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No GroupRepositoryAccess with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GroupRepositoryAccess with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GroupRepositoryAccess with id %v", len(l), p))
 	}
 	return l[0], nil
 }

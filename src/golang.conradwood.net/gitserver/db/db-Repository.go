@@ -35,6 +35,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBRepository *DBRepository
 )
 
 type DBRepository struct {
@@ -43,6 +48,25 @@ type DBRepository struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBRepository() *DBRepository {
+	if default_def_DBRepository != nil {
+		return default_def_DBRepository
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBRepository(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBRepository = res
+	return res
+}
 func NewDBRepository(db *sql.DB) *DBRepository {
 	foo := DBRepository{DB: db}
 	foo.SQLTablename = "repository"
@@ -124,10 +148,10 @@ func (a *DBRepository) ByID(ctx context.Context, p uint64) (*savepb.Repository, 
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No Repository with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No Repository with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Repository with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Repository with id %v", len(l), p))
 	}
 	return l[0], nil
 }

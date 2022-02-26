@@ -35,6 +35,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBPingState *DBPingState
 )
 
 type DBPingState struct {
@@ -43,6 +48,25 @@ type DBPingState struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBPingState() *DBPingState {
+	if default_def_DBPingState != nil {
+		return default_def_DBPingState
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBPingState(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBPingState = res
+	return res
+}
 func NewDBPingState(db *sql.DB) *DBPingState {
 	foo := DBPingState{DB: db}
 	foo.SQLTablename = "pingstate"
@@ -124,10 +148,10 @@ func (a *DBPingState) ByID(ctx context.Context, p uint64) (*savepb.PingState, er
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No PingState with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No PingState with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) PingState with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) PingState with id %v", len(l), p))
 	}
 	return l[0], nil
 }

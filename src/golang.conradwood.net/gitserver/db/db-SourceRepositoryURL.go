@@ -35,6 +35,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBSourceRepositoryURL *DBSourceRepositoryURL
 )
 
 type DBSourceRepositoryURL struct {
@@ -43,6 +48,25 @@ type DBSourceRepositoryURL struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBSourceRepositoryURL() *DBSourceRepositoryURL {
+	if default_def_DBSourceRepositoryURL != nil {
+		return default_def_DBSourceRepositoryURL
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBSourceRepositoryURL(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBSourceRepositoryURL = res
+	return res
+}
 func NewDBSourceRepositoryURL(db *sql.DB) *DBSourceRepositoryURL {
 	foo := DBSourceRepositoryURL{DB: db}
 	foo.SQLTablename = "sourcerepositoryurl"
@@ -124,10 +148,10 @@ func (a *DBSourceRepositoryURL) ByID(ctx context.Context, p uint64) (*savepb.Sou
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No SourceRepositoryURL with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No SourceRepositoryURL with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) SourceRepositoryURL with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) SourceRepositoryURL with id %v", len(l), p))
 	}
 	return l[0], nil
 }

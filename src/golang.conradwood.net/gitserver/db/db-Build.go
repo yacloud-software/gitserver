@@ -16,7 +16,7 @@ package db
 
 Main Table:
 
- CREATE TABLE build (id integer primary key default nextval('build_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,timestamp integer not null  ,success boolean not null  );
+ CREATE TABLE build (id integer primary key default nextval('build_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );
 
 Alter statements:
 ALTER TABLE build ADD COLUMN repositoryid bigint not null default 0;
@@ -24,13 +24,13 @@ ALTER TABLE build ADD COLUMN commithash text not null default '';
 ALTER TABLE build ADD COLUMN branch text not null default '';
 ALTER TABLE build ADD COLUMN logmessage text not null default '';
 ALTER TABLE build ADD COLUMN userid text not null default '';
-ALTER TABLE build ADD COLUMN timestamp integer not null default 0;
+ALTER TABLE build ADD COLUMN r_timestamp integer not null default 0;
 ALTER TABLE build ADD COLUMN success boolean not null default false;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
 
- CREATE TABLE build_archive (id integer unique not null,repositoryid bigint not null,commithash text not null,branch text not null,logmessage text not null,userid text not null,timestamp integer not null,success boolean not null);
+ CREATE TABLE build_archive (id integer unique not null,repositoryid bigint not null,commithash text not null,branch text not null,logmessage text not null,userid text not null,r_timestamp integer not null,success boolean not null);
 */
 
 import (
@@ -39,6 +39,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBBuild *DBBuild
 )
 
 type DBBuild struct {
@@ -47,6 +52,25 @@ type DBBuild struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBBuild() *DBBuild {
+	if default_def_DBBuild != nil {
+		return default_def_DBBuild
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBBuild(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBBuild = res
+	return res
+}
 func NewDBBuild(db *sql.DB) *DBBuild {
 	foo := DBBuild{DB: db}
 	foo.SQLTablename = "build"
@@ -64,7 +88,7 @@ func (a *DBBuild) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBBuild", "insert into "+a.SQLArchivetablename+"+ (id,repositoryid, commithash, branch, logmessage, userid, timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
+	_, e := a.DB.ExecContext(ctx, "archive_DBBuild", "insert into "+a.SQLArchivetablename+"+ (id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
 	if e != nil {
 		return e
 	}
@@ -77,7 +101,7 @@ func (a *DBBuild) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBBuild) Save(ctx context.Context, p *savepb.Build) (uint64, error) {
 	qn := "DBBuild_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, commithash, branch, logmessage, userid, timestamp, success) values ($1, $2, $3, $4, $5, $6, $7) returning id", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1, $2, $3, $4, $5, $6, $7) returning id", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -97,13 +121,13 @@ func (a *DBBuild) Save(ctx context.Context, p *savepb.Build) (uint64, error) {
 // Save using the ID specified
 func (a *DBBuild) SaveWithID(ctx context.Context, p *savepb.Build) error {
 	qn := "insert_DBBuild"
-	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,repositoryid, commithash, branch, logmessage, userid, timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
+	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
 	return a.Error(ctx, qn, e)
 }
 
 func (a *DBBuild) Update(ctx context.Context, p *savepb.Build) error {
 	qn := "DBBuild_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, commithash=$2, branch=$3, logmessage=$4, userid=$5, timestamp=$6, success=$7 where id = $8", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, commithash=$2, branch=$3, logmessage=$4, userid=$5, r_timestamp=$6, success=$7 where id = $8", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success, p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -118,7 +142,7 @@ func (a *DBBuild) DeleteByID(ctx context.Context, p uint64) error {
 // get it by primary id
 func (a *DBBuild) ByID(ctx context.Context, p uint64) (*savepb.Build, error) {
 	qn := "DBBuild_ByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where id = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where id = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error querying (%s)", e))
 	}
@@ -128,10 +152,10 @@ func (a *DBBuild) ByID(ctx context.Context, p uint64) (*savepb.Build, error) {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No Build with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No Build with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Build with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Build with id %v", len(l), p))
 	}
 	return l[0], nil
 }
@@ -139,7 +163,7 @@ func (a *DBBuild) ByID(ctx context.Context, p uint64) (*savepb.Build, error) {
 // get all rows
 func (a *DBBuild) All(ctx context.Context) ([]*savepb.Build, error) {
 	qn := "DBBuild_all"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" order by id")
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" order by id")
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("All: error querying (%s)", e))
 	}
@@ -158,7 +182,7 @@ func (a *DBBuild) All(ctx context.Context) ([]*savepb.Build, error) {
 // get all "DBBuild" rows with matching RepositoryID
 func (a *DBBuild) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByRepositoryID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where repositoryid = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where repositoryid = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error querying (%s)", e))
 	}
@@ -173,7 +197,7 @@ func (a *DBBuild) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.Build
 // the 'like' lookup
 func (a *DBBuild) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeRepositoryID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where repositoryid ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where repositoryid ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error querying (%s)", e))
 	}
@@ -188,7 +212,7 @@ func (a *DBBuild) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savepb.B
 // get all "DBBuild" rows with matching CommitHash
 func (a *DBBuild) ByCommitHash(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByCommitHash"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where commithash = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where commithash = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByCommitHash: error querying (%s)", e))
 	}
@@ -203,7 +227,7 @@ func (a *DBBuild) ByCommitHash(ctx context.Context, p string) ([]*savepb.Build, 
 // the 'like' lookup
 func (a *DBBuild) ByLikeCommitHash(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeCommitHash"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where commithash ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where commithash ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByCommitHash: error querying (%s)", e))
 	}
@@ -218,7 +242,7 @@ func (a *DBBuild) ByLikeCommitHash(ctx context.Context, p string) ([]*savepb.Bui
 // get all "DBBuild" rows with matching Branch
 func (a *DBBuild) ByBranch(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByBranch"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where branch = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where branch = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByBranch: error querying (%s)", e))
 	}
@@ -233,7 +257,7 @@ func (a *DBBuild) ByBranch(ctx context.Context, p string) ([]*savepb.Build, erro
 // the 'like' lookup
 func (a *DBBuild) ByLikeBranch(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeBranch"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where branch ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where branch ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByBranch: error querying (%s)", e))
 	}
@@ -248,7 +272,7 @@ func (a *DBBuild) ByLikeBranch(ctx context.Context, p string) ([]*savepb.Build, 
 // get all "DBBuild" rows with matching LogMessage
 func (a *DBBuild) ByLogMessage(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLogMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where logmessage = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where logmessage = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByLogMessage: error querying (%s)", e))
 	}
@@ -263,7 +287,7 @@ func (a *DBBuild) ByLogMessage(ctx context.Context, p string) ([]*savepb.Build, 
 // the 'like' lookup
 func (a *DBBuild) ByLikeLogMessage(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeLogMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where logmessage ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where logmessage ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByLogMessage: error querying (%s)", e))
 	}
@@ -278,7 +302,7 @@ func (a *DBBuild) ByLikeLogMessage(ctx context.Context, p string) ([]*savepb.Bui
 // get all "DBBuild" rows with matching UserID
 func (a *DBBuild) ByUserID(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where userid = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where userid = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
 	}
@@ -293,7 +317,7 @@ func (a *DBBuild) ByUserID(ctx context.Context, p string) ([]*savepb.Build, erro
 // the 'like' lookup
 func (a *DBBuild) ByLikeUserID(ctx context.Context, p string) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where userid ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where userid ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
 	}
@@ -308,7 +332,7 @@ func (a *DBBuild) ByLikeUserID(ctx context.Context, p string) ([]*savepb.Build, 
 // get all "DBBuild" rows with matching Timestamp
 func (a *DBBuild) ByTimestamp(ctx context.Context, p uint32) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByTimestamp"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where timestamp = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where r_timestamp = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByTimestamp: error querying (%s)", e))
 	}
@@ -323,7 +347,7 @@ func (a *DBBuild) ByTimestamp(ctx context.Context, p uint32) ([]*savepb.Build, e
 // the 'like' lookup
 func (a *DBBuild) ByLikeTimestamp(ctx context.Context, p uint32) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeTimestamp"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where timestamp ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where r_timestamp ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByTimestamp: error querying (%s)", e))
 	}
@@ -338,7 +362,7 @@ func (a *DBBuild) ByLikeTimestamp(ctx context.Context, p uint32) ([]*savepb.Buil
 // get all "DBBuild" rows with matching Success
 func (a *DBBuild) BySuccess(ctx context.Context, p bool) ([]*savepb.Build, error) {
 	qn := "DBBuild_BySuccess"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where success = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where success = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error querying (%s)", e))
 	}
@@ -353,7 +377,7 @@ func (a *DBBuild) BySuccess(ctx context.Context, p bool) ([]*savepb.Build, error
 // the 'like' lookup
 func (a *DBBuild) ByLikeSuccess(ctx context.Context, p bool) ([]*savepb.Build, error) {
 	qn := "DBBuild_ByLikeSuccess"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, timestamp, success from "+a.SQLTablename+" where success ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success from "+a.SQLTablename+" where success ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error querying (%s)", e))
 	}
@@ -386,10 +410,10 @@ func (a *DBBuild) Tablename() string {
 }
 
 func (a *DBBuild) SelectCols() string {
-	return "id,repositoryid, commithash, branch, logmessage, userid, timestamp, success"
+	return "id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success"
 }
 func (a *DBBuild) SelectColsQualified() string {
-	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".commithash, " + a.SQLTablename + ".branch, " + a.SQLTablename + ".logmessage, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".timestamp, " + a.SQLTablename + ".success"
+	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".commithash, " + a.SQLTablename + ".branch, " + a.SQLTablename + ".logmessage, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".r_timestamp, " + a.SQLTablename + ".success"
 }
 
 func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Build, error) {
@@ -411,8 +435,8 @@ func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Bui
 func (a *DBBuild) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,timestamp integer not null  ,success boolean not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,timestamp integer not null  ,success boolean not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)

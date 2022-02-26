@@ -36,6 +36,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBUserRepositoryAccess *DBUserRepositoryAccess
 )
 
 type DBUserRepositoryAccess struct {
@@ -44,6 +49,25 @@ type DBUserRepositoryAccess struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBUserRepositoryAccess() *DBUserRepositoryAccess {
+	if default_def_DBUserRepositoryAccess != nil {
+		return default_def_DBUserRepositoryAccess
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBUserRepositoryAccess(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBUserRepositoryAccess = res
+	return res
+}
 func NewDBUserRepositoryAccess(db *sql.DB) *DBUserRepositoryAccess {
 	foo := DBUserRepositoryAccess{DB: db}
 	foo.SQLTablename = "userrepositoryaccess"
@@ -125,10 +149,10 @@ func (a *DBUserRepositoryAccess) ByID(ctx context.Context, p uint64) (*savepb.Us
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No UserRepositoryAccess with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No UserRepositoryAccess with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) UserRepositoryAccess with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) UserRepositoryAccess with id %v", len(l), p))
 	}
 	return l[0], nil
 }

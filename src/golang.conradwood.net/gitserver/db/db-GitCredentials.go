@@ -37,6 +37,11 @@ import (
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/sql"
+	"os"
+)
+
+var (
+	default_def_DBGitCredentials *DBGitCredentials
 )
 
 type DBGitCredentials struct {
@@ -45,6 +50,25 @@ type DBGitCredentials struct {
 	SQLArchivetablename string
 }
 
+func DefaultDBGitCredentials() *DBGitCredentials {
+	if default_def_DBGitCredentials != nil {
+		return default_def_DBGitCredentials
+	}
+	psql, err := sql.Open()
+	if err != nil {
+		fmt.Printf("Failed to open database: %s\n", err)
+		os.Exit(10)
+	}
+	res := NewDBGitCredentials(psql)
+	ctx := context.Background()
+	err = res.CreateTable(ctx)
+	if err != nil {
+		fmt.Printf("Failed to create table: %s\n", err)
+		os.Exit(10)
+	}
+	default_def_DBGitCredentials = res
+	return res
+}
 func NewDBGitCredentials(db *sql.DB) *DBGitCredentials {
 	foo := DBGitCredentials{DB: db}
 	foo.SQLTablename = "gitcredentials"
@@ -126,10 +150,10 @@ func (a *DBGitCredentials) ByID(ctx context.Context, p uint64) (*savepb.GitCrede
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No GitCredentials with id %d", p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("No GitCredentials with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GitCredentials with id %d", len(l), p))
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GitCredentials with id %v", len(l), p))
 	}
 	return l[0], nil
 }
