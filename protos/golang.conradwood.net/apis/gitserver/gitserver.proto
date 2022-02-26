@@ -155,6 +155,8 @@ message SourceRepository {
   uint32 Tags=15; // some repos are 'special'. see enum REPOTAGS
   bool Forking=16; // true whilst forking
   uint64 ForkedFrom=17; // if 0: not forked, otherwise original repo id
+  string BuildRoutingTagName=18; // if present (non-empty), the routing tag name for choosing the gitbuilder
+  string BuildRoutingTagValue=19; // if present (non-empty), the routing tag value for choosing the gitbuilder
 }
 // the URL a given repository can be accessed under.
 // Note: Repositories may be accessed under multiple different URLs
