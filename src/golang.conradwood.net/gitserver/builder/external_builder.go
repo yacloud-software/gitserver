@@ -2,6 +2,7 @@ package builder
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"golang.conradwood.net/apis/gitbuilder"
 	gitpb "golang.conradwood.net/apis/gitserver"
@@ -10,6 +11,10 @@ import (
 	"golang.conradwood.net/go-easyops/sql"
 	"io"
 	"time"
+)
+
+var (
+	def_routing = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
 )
 
 // use the gitbuilder service to build instead of locally forking it off
@@ -66,10 +71,15 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 		ArtefactName: repo.ArtefactName,
 	}
 	// might have to add special routing tags to context to route it to a SPECIFIC builder
+	rm := make(map[string]string)
 	if repo.BuildRoutingTagName != "" && repo.BuildRoutingTagValue != "" {
-		rm := map[string]string{repo.BuildRoutingTagName: repo.BuildRoutingTagValue}
-		ctx = authremote.DerivedContextWithRouting(ctx, rm)
+		rm[repo.BuildRoutingTagName] = repo.BuildRoutingTagValue
+	} else {
+		if *def_routing {
+			rm["provides"] = "default"
+		}
 	}
+	ctx = authremote.DerivedContextWithRouting(ctx, rm)
 	cl, err := gb.Build(ctx, br)
 	if err != nil {
 		return err
