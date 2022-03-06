@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	latest      = flag.Bool("latest", false, "get latest build of current repo")
 	desc        = flag.String("desc", "", "description of new repo")
 	delete      = flag.Bool("delete", false, "delete repo")
 	print_repos = flag.Bool("print_repos", false, "print repositories")
@@ -25,10 +26,15 @@ var (
 	path        = flag.String("path", "", "pathname to serve repo on (the repository name as far as git is concerned)")
 	check       = flag.Bool("check", false, "if true, check if there is a git server at host")
 	getrepo     = flag.Bool("info", false, "if true get repo information (requires repoid)")
+	debug       = flag.Bool("debug", false, "debug mode")
 )
 
 func main() {
 	flag.Parse()
+	if *latest {
+		Latest()
+		os.Exit(0)
+	}
 	ctx := tokens.ContextWithToken()
 	if *check {
 		Check()
