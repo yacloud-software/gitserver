@@ -27,10 +27,15 @@ var (
 	check       = flag.Bool("check", false, "if true, check if there is a git server at host")
 	getrepo     = flag.Bool("info", false, "if true get repo information (requires repoid)")
 	debug       = flag.Bool("debug", false, "debug mode")
+	builds      = flag.Bool("builds", false, "do builds")
 )
 
 func main() {
 	flag.Parse()
+	if *builds {
+		DoBuilds()
+		os.Exit(0)
+	}
 	if *latest {
 		Latest()
 		os.Exit(0)

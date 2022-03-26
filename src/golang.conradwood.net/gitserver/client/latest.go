@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/authremote"
@@ -9,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-func Latest() {
+func GetRepository(ctx context.Context) *pb.SourceRepository {
 	tr, err := findGitTopDir()
 	utils.Bail("failed to find .git in repo", err)
 	fmt.Printf("Repository root: %s\n", tr)
@@ -26,10 +27,14 @@ func Latest() {
 		}
 	}
 
-	ctx := authremote.Context()
 	req := &pb.ByURLRequest{URL: url}
 	sr, err := pb.GetGIT2Client().RepoByURL(ctx, req)
 	utils.Bail(fmt.Sprintf("failed to get repo for url \"%s\"", url), err)
+	return sr
+}
+func Latest() {
+	ctx := authremote.Context()
+	sr := GetRepository(ctx)
 	fmt.Printf("Repository  : #%d\n", sr.ID)
 	lreq := &pb.ByIDRequest{ID: sr.ID}
 	build, err := pb.GetGIT2Client().GetLatestBuild(ctx, lreq)
