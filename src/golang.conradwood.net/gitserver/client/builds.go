@@ -17,6 +17,7 @@ func DoBuilds() {
 	t := &utils.Table{}
 	for _, b := range bl.Builds {
 		t.AddUint64(b.ID)
+		t.AddBool(b.Success)
 		t.AddString(utils.TimestampString(b.Timestamp))
 		t.AddString(b.CommitHash)
 		t.NewRow()
