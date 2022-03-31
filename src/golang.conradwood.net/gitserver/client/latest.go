@@ -11,6 +11,14 @@ import (
 )
 
 func GetRepository(ctx context.Context) *pb.SourceRepository {
+	repo := uint64(*repoid)
+	if repo != 0 {
+		fmt.Printf("Display repo #%d\n", repo)
+		rid := &pb.ByIDRequest{ID: repo}
+		rl, err := pb.GetGIT2Client().RepoByID(ctx, rid)
+		utils.Bail("failed to get repo", err)
+		return rl
+	}
 	tr, err := findGitTopDir()
 	utils.Bail("failed to find .git in repo", err)
 	fmt.Printf("Repository root: %s\n", tr)
@@ -61,5 +69,9 @@ func traverseToTopOfRepo(dir string) (string, error) {
 		return dir, nil
 	}
 	l := filepath.Dir(dir)
+	if l == dir || len(l) < 2 {
+		fmt.Printf("Cannot find git repository.\n")
+		os.Exit(10)
+	}
 	return traverseToTopOfRepo(l)
 }

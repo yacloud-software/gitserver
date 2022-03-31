@@ -71,22 +71,24 @@ func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.S
 	return g.RepoByID(ctx, r)
 }
 func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
-	fmt.Printf("Getting repo by id %d\n", req.ID)
-	ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
-	ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
-	if err != nil {
-		return nil, err
-	}
-	if ol == nil {
-		fmt.Printf("for a weird reason we did not get a permissions object but no error either")
-		return nil, fmt.Errorf("permission error")
-	}
-	if ol.Permissions == nil {
-		return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", req.ID)
-	}
-	if !auth.IsRoot(ctx) {
-		if !ol.Permissions.View && !ol.Permissions.Read && !ol.Permissions.Execute {
-			return nil, errors.AccessDenied(ctx, "access denied to git repository %d", req.ID)
+	if !isrepobuilder(ctx) {
+		fmt.Printf("Getting repo by id %d\n", req.ID)
+		ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
+		ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
+		if err != nil {
+			return nil, err
+		}
+		if ol == nil {
+			fmt.Printf("for a weird reason we did not get a permissions object but no error either")
+			return nil, fmt.Errorf("permission error")
+		}
+		if ol.Permissions == nil {
+			return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", req.ID)
+		}
+		if !auth.IsRoot(ctx) {
+			if !ol.Permissions.View && !ol.Permissions.Read && !ol.Permissions.Execute {
+				return nil, errors.AccessDenied(ctx, "access denied to git repository %d", req.ID)
+			}
 		}
 	}
 	repo, err := g.repo_store.ByID(ctx, req.ID)

@@ -77,12 +77,10 @@ func main() {
 	os.Exit(0)
 }
 func showrepo() {
-	repo := uint64(*repoid)
-	fmt.Printf("Display repo #%d\n", repo)
 	ctx := authremote.Context()
-	rid := &pb.ByIDRequest{ID: repo}
-	rl, err := pb.GetGIT2Client().RepoByID(ctx, rid)
-	utils.Bail("failed to get repo", err)
+	rl := GetRepository(ctx)
+	rid := &pb.ByIDRequest{ID: rl.ID}
+	fmt.Printf("RepositoryID  : %d\n", rl.ID)
 	fmt.Printf("Artefact      : %s\n", rl.ArtefactName)
 	fmt.Printf("Last Commit   : %s\n", utils.TimestampString(rl.LastCommit))
 	fmt.Printf("Last Committer: %s\n", rl.LastCommitUser)
