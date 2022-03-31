@@ -157,6 +157,7 @@ message SourceRepository {
   uint64 ForkedFrom=17; // if 0: not forked, otherwise original repo id
   string BuildRoutingTagName=18; // if present (non-empty), the routing tag name for choosing the gitbuilder
   string BuildRoutingTagValue=19; // if present (non-empty), the routing tag value for choosing the gitbuilder
+  bool ReadOnly=20; // if true can only be read (with some services being excempt)
 }
 // the URL a given repository can be accessed under.
 // Note: Repositories may be accessed under multiple different URLs
@@ -190,12 +191,14 @@ message SetRepoFlagsRequest {
   uint64 RepoID = 1;
   bool RunPostReceive = 2;
   bool RunPreReceive = 3;
+  bool ReadOnly = 4;
 }
 message ForkRequest {
   uint64 RepositoryID=1; // the one to fork
   string ArtefactName =2;
   SourceRepositoryURL URL=3; // the new URL
   string Description =4;
+  bool CreateReadOnly = 5; // if true, create the fork as readonly (intention: a repobuilder can patch it without user commit conflicts)
 }
 message PingState {
   uint64 ID=1;
@@ -251,6 +254,7 @@ service GIT2 {
   rpc GetRecentBuilds(ByIDRequest) returns (BuildList);
   // get most recent build
   rpc GetLatestBuild(ByIDRequest) returns (Build);
+  // 
 }
 
 
