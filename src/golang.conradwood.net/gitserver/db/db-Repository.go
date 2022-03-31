@@ -84,7 +84,7 @@ func (a *DBRepository) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBRepository", "insert into "+a.SQLArchivetablename+"+ (id,reponame, ownerid, artefactname) values ($1,$2, $3, $4) ", p.ID, p.RepoName, p.OwnerID, p.ArtefactName)
+	_, e := a.DB.ExecContext(ctx, "archive_DBRepository", "insert into "+a.SQLArchivetablename+" (id,reponame, ownerid, artefactname) values ($1,$2, $3, $4) ", p.ID, p.RepoName, p.OwnerID, p.ArtefactName)
 	if e != nil {
 		return e
 	}

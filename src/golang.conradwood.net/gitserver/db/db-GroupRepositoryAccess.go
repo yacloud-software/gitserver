@@ -85,7 +85,7 @@ func (a *DBGroupRepositoryAccess) Archive(ctx context.Context, id uint64) error 
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBGroupRepositoryAccess", "insert into "+a.SQLArchivetablename+"+ (id,repoid, groupid, read, write) values ($1,$2, $3, $4, $5) ", p.ID, p.RepoID, p.GroupID, p.Read, p.Write)
+	_, e := a.DB.ExecContext(ctx, "archive_DBGroupRepositoryAccess", "insert into "+a.SQLArchivetablename+" (id,repoid, groupid, read, write) values ($1,$2, $3, $4, $5) ", p.ID, p.RepoID, p.GroupID, p.Read, p.Write)
 	if e != nil {
 		return e
 	}

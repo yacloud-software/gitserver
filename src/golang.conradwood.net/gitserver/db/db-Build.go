@@ -88,7 +88,7 @@ func (a *DBBuild) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBBuild", "insert into "+a.SQLArchivetablename+"+ (id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
+	_, e := a.DB.ExecContext(ctx, "archive_DBBuild", "insert into "+a.SQLArchivetablename+" (id,repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1,$2, $3, $4, $5, $6, $7, $8) ", p.ID, p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
 	if e != nil {
 		return e
 	}

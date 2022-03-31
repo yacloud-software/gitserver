@@ -84,7 +84,7 @@ func (a *DBWatchers) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBWatchers", "insert into "+a.SQLArchivetablename+"+ (id,userid, repositoryid, notifytype) values ($1,$2, $3, $4) ", p.ID, p.UserID, p.RepositoryID, p.Notifytype)
+	_, e := a.DB.ExecContext(ctx, "archive_DBWatchers", "insert into "+a.SQLArchivetablename+" (id,userid, repositoryid, notifytype) values ($1,$2, $3, $4) ", p.ID, p.UserID, p.RepositoryID, p.Notifytype)
 	if e != nil {
 		return e
 	}

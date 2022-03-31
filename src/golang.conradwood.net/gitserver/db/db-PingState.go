@@ -84,7 +84,7 @@ func (a *DBPingState) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBPingState", "insert into "+a.SQLArchivetablename+"+ (id,associationtoken, created, responsetoken) values ($1,$2, $3, $4) ", p.ID, p.AssociationToken, p.Created, p.ResponseToken)
+	_, e := a.DB.ExecContext(ctx, "archive_DBPingState", "insert into "+a.SQLArchivetablename+" (id,associationtoken, created, responsetoken) values ($1,$2, $3, $4) ", p.ID, p.AssociationToken, p.Created, p.ResponseToken)
 	if e != nil {
 		return e
 	}

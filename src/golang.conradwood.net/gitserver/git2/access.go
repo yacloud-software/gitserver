@@ -32,6 +32,10 @@ func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
 		fmt.Printf("Access to repo %d by repobuilder only\n", h.repo.gitrepo.ID)
 		return false
 	}
+	if !isrepobuilder(ctx) && (h.isWrite() && h.repo.gitrepo.ReadOnly) {
+		fmt.Printf("Access to repo %d not granted (repo is readonly)\n", h.repo.gitrepo.ID)
+		return false
+	}
 
 	err := isDeleted(ctx, h.repo.gitrepo)
 	if err != nil {

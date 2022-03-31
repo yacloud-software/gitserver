@@ -90,7 +90,7 @@ func (a *DBCreateRepoLog) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBCreateRepoLog", "insert into "+a.SQLArchivetablename+"+ (id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1,$2, $3, $4, $5, $6, $7, $8, $9, $10) ", p.ID, p.RepositoryID, p.UserID, p.Context, p.Action, p.Success, p.ErrorMessage, p.Started, p.Finished, p.AssociationToken)
+	_, e := a.DB.ExecContext(ctx, "archive_DBCreateRepoLog", "insert into "+a.SQLArchivetablename+" (id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1,$2, $3, $4, $5, $6, $7, $8, $9, $10) ", p.ID, p.RepositoryID, p.UserID, p.Context, p.Action, p.Success, p.ErrorMessage, p.Started, p.Finished, p.AssociationToken)
 	if e != nil {
 		return e
 	}

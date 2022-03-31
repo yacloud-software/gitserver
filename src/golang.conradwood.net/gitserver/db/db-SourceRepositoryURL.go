@@ -84,7 +84,7 @@ func (a *DBSourceRepositoryURL) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBSourceRepositoryURL", "insert into "+a.SQLArchivetablename+"+ (id,v2repositoryid, host, path) values ($1,$2, $3, $4) ", p.ID, p.V2RepositoryID, p.Host, p.Path)
+	_, e := a.DB.ExecContext(ctx, "archive_DBSourceRepositoryURL", "insert into "+a.SQLArchivetablename+" (id,v2repositoryid, host, path) values ($1,$2, $3, $4) ", p.ID, p.V2RepositoryID, p.Host, p.Path)
 	if e != nil {
 		return e
 	}

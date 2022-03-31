@@ -86,7 +86,7 @@ func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBGitCredentials", "insert into "+a.SQLArchivetablename+"+ (id,userid, host, path, username, password) values ($1,$2, $3, $4, $5, $6) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password)
+	_, e := a.DB.ExecContext(ctx, "archive_DBGitCredentials", "insert into "+a.SQLArchivetablename+" (id,userid, host, path, username, password) values ($1,$2, $3, $4, $5, $6) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password)
 	if e != nil {
 		return e
 	}

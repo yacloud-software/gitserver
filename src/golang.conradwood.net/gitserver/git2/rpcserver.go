@@ -270,6 +270,7 @@ func (g *GIT2) SetRepoFlags(ctx context.Context, req *gitpb.SetRepoFlagsRequest)
 
 	gr.RunPostReceive = req.RunPostReceive
 	gr.RunPreReceive = req.RunPreReceive
+	gr.ReadOnly = req.ReadOnly
 	err = g.repo_store.Update(ctx, gr)
 	if err != nil {
 		return nil, err
