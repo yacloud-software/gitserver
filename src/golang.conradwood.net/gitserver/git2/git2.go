@@ -217,6 +217,11 @@ func (h *HTTPRequest) ServeHTTP() {
 		h.ErrorCode(403, "no such repo directory")
 		return
 	}
+	if !isrepobuilder(ctx) && (h.isWrite() && h.repo.gitrepo.ReadOnly) {
+		h.ErrorCode(409, fmt.Sprintf("Write-Access to repo %d not granted (repo is readonly)\n", h.repo.gitrepo.ID))
+		return
+	}
+
 	if h.isWrite() && h.user.ID != REPO_SERVICE_ID {
 		if h.repo == nil || h.git2 == nil {
 			fmt.Printf("uninitialized request\n")
