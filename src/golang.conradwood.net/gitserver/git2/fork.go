@@ -61,6 +61,7 @@ func (g *GIT2) Fork(ctx context.Context, req *gitpb.ForkRequest) (*gitpb.SourceR
 	sr.UserCommits = 0
 	sr.URLs = sr.URLs[:0] // remove urls
 	sr.ReadOnly = req.CreateReadOnly
+	sr.CreateUser = u.ID
 	if req.Description == "" {
 		sr.Description = "fork of " + sr.Description
 	} else {
