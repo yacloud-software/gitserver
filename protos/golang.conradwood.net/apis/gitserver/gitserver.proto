@@ -217,6 +217,19 @@ message RepoFilter {
   RepoTagRequest Tags=1;
 }
 
+enum NewRepoState {
+  NOCHANGE=0;
+  SET_TRUE=1;
+  SET_FALSE=2;
+}
+message UpdateRepoStatusRequest {
+  uint64 RepoID=1;
+  NewRepoState ReadOnly=2;
+  NewRepoState RunHooks=3;
+}
+
+
+
 /*
  a new implementation of git server
  Major Differences to GIT1:
@@ -255,10 +268,9 @@ service GIT2 {
   rpc GetRecentBuilds(ByIDRequest) returns (BuildList);
   // get most recent build
   rpc GetLatestBuild(ByIDRequest) returns (Build);
-  // 
+  // make repobuilder no longer read-only
+  rpc UpdateRepoStatus(UpdateRepoStatusRequest) returns (SourceRepository);
 }
-
-
 
 /*********************************
 git credentials
