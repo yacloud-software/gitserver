@@ -49,8 +49,10 @@ func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
 				return true
 			}
 		}
-		fmt.Printf("Repobuilder may not read repo %d\n", h.repo.gitrepo.ID)
-		return false
+		//		fmt.Printf("Repobuilder may not read repo %d\n", h.repo.gitrepo.ID)
+		//		return false
+		fmt.Printf("Repobuilder may read any repo %d\n", h.repo.gitrepo.ID)
+		return true
 	}
 	// check user access
 	objauth := objectauth.GetObjectAuthClient()
