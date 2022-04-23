@@ -41,8 +41,8 @@ func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
 	// repobuilder also has some limited (read) access
 	if isrepobuilder(ctx) {
 		if h.isWrite() {
-			fmt.Printf("Repobuilder may not write to repo %d\n", h.repo.gitrepo.ID)
-			return false
+			fmt.Printf("Repobuilder may write to any repo %d\n", h.repo.gitrepo.ID)
+			return true
 		}
 		for _, r := range REPOBUILDER_READ {
 			if r == h.repo.gitrepo.ID {
