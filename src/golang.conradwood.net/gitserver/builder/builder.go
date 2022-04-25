@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	LONG_RUNNING_SECS = 600 // used to create long running contexts
+	LONG_RUNNING_SECS = 1200 // used to create long running contexts
 )
 
 var (
