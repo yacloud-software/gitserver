@@ -39,7 +39,7 @@ func (g *GIT2) UpdateRepoStatus(ctx context.Context, req *gitpb.UpdateRepoStatus
 		return nil, err
 	}
 
-	return nil, nil
+	return sr, nil
 }
 func decode_repostate(i gitpb.NewRepoState) (bool, bool) {
 	if i == gitpb.NewRepoState_SET_TRUE {
