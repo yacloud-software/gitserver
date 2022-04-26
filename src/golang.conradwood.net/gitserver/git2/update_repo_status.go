@@ -3,15 +3,17 @@ package git2
 import (
 	"context"
 	gitpb "golang.conradwood.net/apis/gitserver"
-	"golang.conradwood.net/go-easyops/auth"
+	//	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/errors"
 )
 
 func (g *GIT2) UpdateRepoStatus(ctx context.Context, req *gitpb.UpdateRepoStatusRequest) (*gitpb.SourceRepository, error) {
-	u := auth.GetUser(ctx)
-	if u == nil {
-		return nil, errors.Unauthenticated(ctx, "please authenticate")
-	}
+	/*
+		u := auth.GetUser(ctx)
+		if u == nil {
+			return nil, errors.Unauthenticated(ctx, "please authenticate")
+		}
+	*/
 	if !isrepobuilder(ctx) {
 		return nil, errors.AccessDenied(ctx, "access only for repobuilder")
 	}
