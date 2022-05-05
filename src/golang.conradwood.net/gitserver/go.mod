@@ -25,18 +25,19 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	golang.conradwood.net/apis/autodeployer v1.1.1687 // indirect
-	golang.conradwood.net/apis/deploymonkey v1.1.1687 // indirect
-	golang.conradwood.net/apis/echoservice v1.1.1687 // indirect
-	golang.conradwood.net/apis/errorlogger v1.1.1687 // indirect
-	golang.conradwood.net/apis/framework v1.1.1687 // indirect
+	golang.conradwood.net/apis/autodeployer v1.1.1702 // indirect
+	golang.conradwood.net/apis/deploymonkey v1.1.1702 // indirect
+	golang.conradwood.net/apis/echoservice v1.1.1702 // indirect
+	golang.conradwood.net/apis/errorlogger v1.1.1702 // indirect
+	golang.conradwood.net/apis/framework v1.1.1702 // indirect
 	golang.conradwood.net/apis/h2gproxy v1.1.1702 // indirect
-	golang.conradwood.net/apis/objectstore v1.1.1687 // indirect
-	golang.conradwood.net/apis/registry v1.1.1687 // indirect
-	golang.conradwood.net/apis/rpcinterceptor v1.1.1687 // indirect
+	golang.conradwood.net/apis/objectstore v1.1.1702 // indirect
+	golang.conradwood.net/apis/registry v1.1.1702 // indirect
+	golang.conradwood.net/apis/rpcinterceptor v1.1.1702 // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20220422154200-b37d22cd5731 // indirect
+	google.golang.org/genproto v0.0.0-20220505152158-f39f71e6c8f3 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 )
+
 replace golang.conradwood.net/apis/gitserver => ../../golang.conradwood.net/apis/gitserver
