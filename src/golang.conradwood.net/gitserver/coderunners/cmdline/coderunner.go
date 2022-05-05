@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	_ "golang.conradwood.net/coderunners/java"
-	"golang.conradwood.net/coderunners/registry"
+	_ "golang.conradwood.net/gitserver/coderunners/java"
+	"golang.conradwood.net/gitserver/coderunners/registry"
 )
 
 func main() {
