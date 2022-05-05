@@ -269,6 +269,8 @@ golang.conradwood.net/apis/slackgateway v1.1.1702 h1:0lp7bu7XDXdN9rDB2i1ZU91u0fx
 golang.conradwood.net/apis/slackgateway v1.1.1702/go.mod h1:FKl4IE5XD7RRfar2OmW8ZXFziG3sqF226Jg3GWuNF/o=
 golang.conradwood.net/go-easyops v0.1.12307 h1:HFyuvCwLZ1rJM9dnPdAsJzNy2bb8KP8NC9LFW2RMmQc=
 golang.conradwood.net/go-easyops v0.1.12307/go.mod h1:wegPtRbmC8VTZrEf6Zq001+O9yKUDN0S3aw01wtOsgM=
+golang.conradwood.net/go-easyops v0.1.12425 h1:RF92fXdA92kaMQCqSyEz4F8GJ+o2u/x7b2hzwOXynHo=
+golang.conradwood.net/go-easyops v0.1.12425/go.mod h1:wegPtRbmC8VTZrEf6Zq001+O9yKUDN0S3aw01wtOsgM=
 golang.org/x/crypto v0.0.0-20180904163835-0709b304e793/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20190510104115-cbcb75029529/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
