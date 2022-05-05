@@ -2,8 +2,8 @@ package builder
 
 import (
 	"context"
-	"golang.conradwood.net/coderunners"
-	"golang.conradwood.net/coderunners/registry"
+	"golang.conradwood.net/gitserver/coderunners"
+	"golang.conradwood.net/gitserver/coderunners/registry"
 	//	"encoding/base64"
 	"fmt"
 	am "golang.conradwood.net/apis/auth"
