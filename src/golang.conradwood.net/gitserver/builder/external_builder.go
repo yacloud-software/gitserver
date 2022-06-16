@@ -79,7 +79,7 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 			rm["provides"] = "default"
 		}
 	}
-	ctx = authremote.DerivedContextWithRouting(ctx, rm, false)
+	ctx = authremote.DerivedContextWithRouting(ctx, rm, true)
 	cl, err := gb.Build(ctx, br)
 	if err != nil {
 		return err
