@@ -6,7 +6,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	golang.conradwood.net/apis/auth v1.1.1728
 	golang.conradwood.net/apis/common v1.1.1728
-	golang.conradwood.net/go-easyops v0.1.12713
+	golang.conradwood.net/go-easyops v0.1.12738
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2
 	google.golang.org/grpc v1.46.2
 )
