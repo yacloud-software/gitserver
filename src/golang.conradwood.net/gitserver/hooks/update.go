@@ -68,6 +68,7 @@ func (u *Update) Process(e *Environment) error {
 func (u *Update) ChangedFileNames() error {
 	var res []*ChangedFile
 	l := linux.New()
+	l.SetRuntime(15)
 	out, err := l.SafelyExecute([]string{"git", "diff", "--name-status", u.oldrev, u.newrev}, nil)
 	if err != nil {
 		fmt.Printf("Git failed. Output:\n%s\n", out)
