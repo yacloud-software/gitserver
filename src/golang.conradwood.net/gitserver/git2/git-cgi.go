@@ -108,6 +108,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 			env = append(env, ncs)
 			env = append(env, fmt.Sprintf("GITSERVER_DIR=%s", h.pwd()))
 			env = append(env, fmt.Sprintf("GITSERVER_TCP_PORT=%d", *config.Gitport))
+			env = append(env, fmt.Sprintf("GITSERVER_GRPC_PORT=%d", *grpc_port))
 			env = append(env, fmt.Sprintf("GITINFO=%s", gp))
 			env = append(env, fmt.Sprintf("REMOTE_USER=%s", h.user.ID))
 			env = append(env, fmt.Sprintf("REPOSITORY_ID=%d", h.repo.gitrepo.ID))

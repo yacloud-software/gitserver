@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/client"
 	"golang.conradwood.net/go-easyops/linux"
-	//	"golang.conradwood.net/go-easyops/utils"
 	"gopkg.in/yaml.v2"
+	"io"
 	"os"
 	"strings"
 )
@@ -13,6 +15,10 @@ import (
 /*
 this runs in the GIT subprocess (not the gitserver)
 */
+
+const (
+	CALL_GITSERVER = false
+)
 
 type Update struct {
 	ev           *Environment
@@ -50,6 +56,41 @@ func (u *Update) Process(e *Environment) error {
 		fmt.Printf("Accepting initial commit\n")
 		return nil
 	}
+
+	// connect to local gitserver and execute within gitserver process space
+	// see readme.txt
+	if CALL_GITSERVER {
+		gip := "localhost:" + os.Getenv("GITSERVER_GRPC_PORT")
+		fmt.Printf("Connection to \"%s\"\n", gip)
+		con, err := client.ConnectWithIP(gip)
+		if err != nil {
+			return err
+		}
+		gc := gitpb.NewGIT2Client(con)
+		srv, err := gc.RunLocalHook(e.ctx, &gitpb.HookRequest{})
+		if err != nil {
+			return err
+		}
+		for {
+			hr, err := srv.Recv()
+			if hr != nil {
+				if hr.Output != "" {
+					fmt.Print(hr.Output)
+				}
+				if hr.ErrorMessage != "" {
+					return fmt.Errorf("Error: %s", hr.ErrorMessage)
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	err := u.ChangedFileNames()
 	if err != nil {
 		return err

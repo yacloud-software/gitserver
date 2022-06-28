@@ -513,6 +513,12 @@ func checkValidHost(ctx context.Context, host string) error {
 	return nil
 }
 
+// see readme.txt
+func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookServer) error {
+	srv.Send(&gitpb.HookResponse{Output: "this is an experimental server-side hook\n"})
+	srv.Send(&gitpb.HookResponse{ErrorMessage: "runlocalhook() not implemented\n"})
+	return nil
+}
 func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
 	svc := auth.GetService(ctx)
 	check_user := true
