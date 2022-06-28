@@ -229,6 +229,17 @@ message UpdateRepoStatusRequest {
 }
 
 
+// ask server to execute a hook
+message HookRequest {
+  uint64 RepoID=1;
+  string NewRev=2; // revision to run hook against
+  string OldRev=3; // revision from which we upgrade
+}
+
+message HookResponse {
+  string ErrorMessage=1; // if non-nil it failed
+  string Output=2; // send this to client
+}
 
 /*
  a new implementation of git server
@@ -270,6 +281,8 @@ service GIT2 {
   rpc GetLatestBuild(ByIDRequest) returns (Build);
   // make repobuilder no longer read-only
   rpc UpdateRepoStatus(UpdateRepoStatusRequest) returns (SourceRepository);
+  // run a hook. this is invoked from git:/hooks/[scriptname]->git-hook binary->gRPC and subject to special restrictions,
+  rpc RunLocalHook(HookRequest) returns (stream HookResponse);
 }
 
 /*********************************
