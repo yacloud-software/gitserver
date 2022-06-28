@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"golang.conradwood.net/apis/auth"
+	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/query"
+	au "golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/cmdline"
 	"golang.conradwood.net/go-easyops/server"
@@ -23,6 +25,7 @@ import (
 )
 
 var (
+	default_user_id         = flag.String("default_user_id", "", "testing only!! if set, and signed_user_is_optional, then requests are processed with this userid")
 	signed_user_is_optional = flag.Bool("signed_user_is_optional", false, "normally, the header remote userid requires a corresponding signed user header. setting this to true makes it optional (useful for testing, not for production use)")
 	root_dir                = flag.String("git2_git_dir", "/srv/git", "top level directory underwhich git directories are stored. e.g. /srv/git2")
 	http_port               = flag.Int("git2_http_port", 0, "http-server for git2, tcp port")
@@ -273,6 +276,13 @@ func (h *HTTPRequest) setUser() bool {
 	*/
 	remoteid := h.SingleHeader("remote_userid")
 	if remoteid == "" {
+		if *signed_user_is_optional {
+			h.user = get_current_user()
+			if h.user == nil {
+				return false
+			}
+			return true
+		}
 		fmt.Printf("ERROR: no remote_userid header found\n")
 		return false
 	}
@@ -351,4 +361,36 @@ func (h *HTTPRequest) GitRoot() string {
 func (h *HTTPRequest) GetScriptDir() string {
 	sc := h.pwd() + "/scripts"
 	return sc
+}
+
+// get the currently running user (of this process)
+func get_current_user() *auth.User {
+	if *default_user_id != "" {
+		ctx, err := authremote.ContextForUserID(*default_user_id)
+		if err != nil {
+			fmt.Printf("failed to get context for user \"%s\": %s\n", *default_user_id, utils.ErrorString(err))
+			return nil
+		}
+		u := au.GetUser(ctx)
+		if u == nil {
+			fmt.Printf("failed to get user from context\n")
+			return nil
+		}
+		fmt.Printf("Running as user: \"%s\"\n", au.Description(u))
+		return u
+
+	}
+	ctx := authremote.Context()
+	u, err := authremote.GetAuthManagerClient().WhoAmI(ctx, &common.Void{})
+	if err != nil {
+		fmt.Printf("failed to whoami(): %s\n", err)
+		return nil
+	}
+	if u == nil {
+		fmt.Printf("No remote_userid, and context has no user either\n")
+		return nil
+	}
+	fmt.Printf("User: %v\n", au.Description(u))
+	return u
+
 }

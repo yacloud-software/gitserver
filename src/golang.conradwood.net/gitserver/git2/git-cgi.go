@@ -2,6 +2,7 @@ package git2
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/config"
@@ -17,6 +18,10 @@ import (
 
 const (
 	gitbin = "/usr/lib/git-core/git-http-backend"
+)
+
+var (
+	debug_cgi = flag.Bool("debug_cgi", false, "if true print cgi responses, including file content when downloading!")
 )
 
 func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
@@ -110,6 +115,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 			env = append(env, "REMOTE_ADDR=local") // backend sets GIT_COMMITTER_EMAIL to ${REMOTE_USER}@http.${REMOTE_ADDR},
 			env = append(env, "GIT_HTTP_MAX_REQUEST_BUFFER=100M")
 			env = append(env, fmt.Sprintf("GIT_PROJECT_ROOT=%s", *gitroot))
+			env = append(env, fmt.Sprintf("GIT_BARE_REPO=%s/%s", *gitroot, h.repo.gitrepo.FilePath))
 			return
 		}(),
 	}
@@ -138,7 +144,7 @@ func (c *cgiResponseWriter) Header() http.Header {
 	return c.h.w.Header()
 }
 func (c *cgiResponseWriter) Write(buf []byte) (int, error) {
-	if *debug {
+	if *debug_cgi {
 		fmt.Printf("cgi said: %s\n", string(buf))
 	}
 	n, err := c.h.w.Write(buf)

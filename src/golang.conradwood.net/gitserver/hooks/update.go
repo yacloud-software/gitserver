@@ -4,8 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"golang.conradwood.net/go-easyops/linux"
+	//	"golang.conradwood.net/go-easyops/utils"
+	"gopkg.in/yaml.v2"
+	"os"
 	"strings"
 )
+
+/*
+this runs in the GIT subprocess (not the gitserver)
+*/
 
 type Update struct {
 	ev           *Environment
@@ -17,6 +24,7 @@ type Update struct {
 type ChangedFile struct {
 	typeLetter string
 	filename   string
+	content    map[string]string // revision->body of file
 }
 
 func (c *ChangedFile) ActionName() string {
@@ -61,6 +69,24 @@ func (u *Update) Process(e *Environment) error {
 			}
 		}
 	}
+
+	err = u.CheckFileContent()
+	if err != nil {
+		fmt.Printf(`
+
+
+**********************************************************************************************
+WARNING - files rejected in update hook
+Error message is: %s
+
+this will be rejected in future versions
+**********************************************************************************************
+
+
+`, err)
+		// return err
+	}
+
 	return nil
 }
 
@@ -80,10 +106,87 @@ func (u *Update) ChangedFileNames() error {
 		}
 		fname := line[1:]
 		fname = strings.TrimPrefix(fname, " ")
-		cf := &ChangedFile{typeLetter: line[:1], filename: fname}
+		fname = strings.TrimPrefix(fname, "\t")
+		cf := &ChangedFile{
+			typeLetter: line[:1],
+			filename:   fname,
+			content:    make(map[string]string),
+		}
 		res = append(res, cf)
 	}
 	u.changedFiles = res
 	//	fmt.Printf("Changed files:\n%s\n", out)
 	return nil
+}
+func (u *Update) CheckFileContent() error {
+	var err error
+	for _, cf := range u.changedFiles {
+		if strings.HasSuffix(cf.filename, ".yaml") {
+			err = u.checkYaml(cf)
+		}
+		if err != nil {
+			return fmt.Errorf("File \"%s\" rejected by git-server checks: %s", cf.filename, err)
+		}
+	}
+	return nil
+}
+func (u *Update) GetFileContent(filename string) (string, error) {
+	fmt.Printf("Oldrev: %s\n", u.oldrev)
+	fmt.Printf("Newrev: %s\n", u.newrev)
+
+	//	exe("git diff " + u.oldrev + " " + u.newrev)
+	gitdir := os.Getenv("GIT_BARE_REPO")
+	fname := filename
+	fname = strings.Trim(fname, " ")
+	fmt.Printf("------ changed file (%s) -------\n", fname)
+	out, err := exe("git --no-pager --git-dir " + gitdir + " show " + u.newrev + ":" + fname)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+	//	return fmt.Errorf("no file content")
+}
+func (u *Update) checkYaml(cf *ChangedFile) error {
+	fmt.Printf("Checking yaml file: %s\n", cf.filename)
+	body, err := cf.GetContent(u.newrev)
+	if err != nil {
+		return err
+	}
+	foo := make(map[string]interface{})
+	err = yaml.Unmarshal([]byte(body), foo)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cf *ChangedFile) GetContent(rev string) (string, error) {
+	body, found := cf.content[rev]
+	if found {
+		return body, nil
+	}
+	gitdir := os.Getenv("GIT_BARE_REPO")
+	fname := cf.filename
+	fname = strings.Trim(fname, " ")
+	//	fmt.Printf("------ changed file (%s) -------\n", fname)
+	body, err := exe("git --no-pager --git-dir " + gitdir + " show " + rev + ":" + fname)
+	if err != nil {
+		return "", err
+	}
+	cf.content[rev] = body
+	return body, nil
+}
+
+// run command and return output
+func exe(com string) (string, error) {
+	fmt.Printf("Executing \"%s\"\n", com)
+	l := linux.New()
+	l.SetRuntime(15)
+	cmd := []string{"bash", "-c", com}
+	out, err := l.SafelyExecute(cmd, nil)
+	fmt.Println(out)
+	if err != nil {
+		return "", err
+	}
+	return out, nil
 }

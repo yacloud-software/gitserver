@@ -1,5 +1,9 @@
 package builder
 
+/*
+git-hook connects via tcp to this monstrosity
+
+*/
 import (
 	"bufio"
 	"flag"
@@ -48,7 +52,11 @@ func (t *TCPConn) HandleConnection() {
 		return
 	}
 	if *use_external_builder {
-		err = external_builder(gt, t)
+		if !*run_scripts {
+			t.Writeln("Builds disabled.\n")
+		} else {
+			err = external_builder(gt, t)
+		}
 	} else {
 		err = t.build(gt)
 	}
