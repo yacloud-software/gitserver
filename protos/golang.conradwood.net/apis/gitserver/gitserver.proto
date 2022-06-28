@@ -231,9 +231,10 @@ message UpdateRepoStatusRequest {
 
 // ask server to execute a hook
 message HookRequest {
-  uint64 RepoID=1;
+  string RequestKey=1; // the localprocess data key
   string NewRev=2; // revision to run hook against
   string OldRev=3; // revision from which we upgrade
+  string HookName=4; // git-names, e.g. "update" 
 }
 
 message HookResponse {
