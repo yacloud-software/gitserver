@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/config"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/utils"
@@ -73,5 +74,5 @@ func (r *Repo) ExistsOnDisk() bool {
 
 // the absolute path to the git directory
 func (r *Repo) AbsDirectory() string {
-	return *root_dir + "/" + r.OnDiskPath()
+	return *config.Gitroot + "/" + r.OnDiskPath()
 }

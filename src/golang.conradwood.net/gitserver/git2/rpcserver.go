@@ -6,6 +6,8 @@ import (
 	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	oa "golang.conradwood.net/apis/objectauth"
+	"golang.conradwood.net/gitserver/checks"
+	"golang.conradwood.net/gitserver/crossprocdata"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/gitserver/query"
 	"golang.conradwood.net/go-easyops/auth"
@@ -515,8 +517,27 @@ func checkValidHost(ctx context.Context, host string) error {
 
 // see readme.txt
 func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookServer) error {
-	srv.Send(&gitpb.HookResponse{Output: "this is an experimental server-side hook\n"})
-	srv.Send(&gitpb.HookResponse{ErrorMessage: "runlocalhook() not implemented\n"})
+	ld := crossprocdata.GetLocalData(req.RequestKey)
+	if ld == nil {
+		return fmt.Errorf("attempt to invoke hook failed, invalid or missing requestkey from gitprocess")
+	}
+	hr := ld.HTTPRequest.(*HTTPRequest)
+	ctx := srv.Context()
+	ch := checks.NewChecker(ctx, hr.repo.gitrepo, req.OldRev, req.NewRev)
+	fmt.Printf("Serverprocess-space hook \"%s\" executing for repo #%d \"%s\"\n", req.HookName, hr.repo.gitrepo.ID, hr.repo.AbsDirectory())
+	var err error
+	if req.HookName == "update" {
+		err = ch.OnUpdate(srv)
+	} else {
+		err = fmt.Errorf("unknown hook \"%s\"", req.HookName)
+	}
+	if err != nil {
+		fmt.Printf("Hook \"%s\" failed: %s\n", req.HookName, err)
+		srv.Send(&gitpb.HookResponse{ErrorMessage: fmt.Sprintf("%s", err)})
+		return nil
+	}
+
+	fmt.Printf("Serverprocess-space hook \"%s\" completed for repo #%d \"%s\"\n", req.HookName, hr.repo.gitrepo.ID, hr.repo.AbsDirectory())
 	return nil
 }
 func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {

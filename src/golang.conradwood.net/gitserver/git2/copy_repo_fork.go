@@ -3,6 +3,7 @@ package git2
 import (
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/config"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/linux"
@@ -60,8 +61,8 @@ func (ct *CopyTrigger) Copy() error {
 		return nil
 	}
 	linux.New()
-	src := *root_dir + "/" + strings.Trim(ct.source.FilePath, "/")
-	dest := *root_dir + "/" + strings.Trim(ct.dest.FilePath, "/")
+	src := *config.Gitroot + "/" + strings.Trim(ct.source.FilePath, "/")
+	dest := *config.Gitroot + "/" + strings.Trim(ct.dest.FilePath, "/")
 	ct.Debugf("Copying \"%s\" to \"%s\"...", src, dest)
 	err = linux.CopyDir(src, dest)
 	if err != nil {

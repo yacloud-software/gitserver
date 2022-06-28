@@ -106,6 +106,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 		Path: gitbin,
 		Env: func() (env []string) {
 			env = append(env, ncs)
+			env = append(env, fmt.Sprintf("GITSERVER_KEY=%s", h.key))
 			env = append(env, fmt.Sprintf("GITSERVER_DIR=%s", h.pwd()))
 			env = append(env, fmt.Sprintf("GITSERVER_TCP_PORT=%d", *config.Gitport))
 			env = append(env, fmt.Sprintf("GITSERVER_GRPC_PORT=%d", *grpc_port))

@@ -17,7 +17,7 @@ this runs in the GIT subprocess (not the gitserver)
 */
 
 const (
-	CALL_GITSERVER = false
+	CALL_GITSERVER = true
 )
 
 type Update struct {
@@ -61,13 +61,18 @@ func (u *Update) Process(e *Environment) error {
 	// see readme.txt
 	if CALL_GITSERVER {
 		gip := "localhost:" + os.Getenv("GITSERVER_GRPC_PORT")
-		fmt.Printf("Connection to \"%s\"\n", gip)
+		fmt.Printf("grpc connection to \"%s\"\n", gip)
 		con, err := client.ConnectWithIP(gip)
 		if err != nil {
 			return err
 		}
 		gc := gitpb.NewGIT2Client(con)
-		srv, err := gc.RunLocalHook(e.ctx, &gitpb.HookRequest{})
+		srv, err := gc.RunLocalHook(e.ctx, &gitpb.HookRequest{
+			RequestKey: os.Getenv("GITSERVER_KEY"),
+			NewRev:     u.newrev,
+			OldRev:     u.oldrev,
+			HookName:   "update",
+		})
 		if err != nil {
 			return err
 		}
@@ -78,7 +83,7 @@ func (u *Update) Process(e *Environment) error {
 					fmt.Print(hr.Output)
 				}
 				if hr.ErrorMessage != "" {
-					return fmt.Errorf("Error: %s", hr.ErrorMessage)
+					return fmt.Errorf("%s", hr.ErrorMessage)
 				}
 			}
 			if err == io.EOF {

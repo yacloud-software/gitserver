@@ -6,6 +6,8 @@ import (
 	"golang.conradwood.net/apis/auth"
 	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/config"
+	"golang.conradwood.net/gitserver/crossprocdata"
 	"golang.conradwood.net/gitserver/query"
 	au "golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
@@ -27,7 +29,6 @@ import (
 var (
 	default_user_id         = flag.String("default_user_id", "", "testing only!! if set, and signed_user_is_optional, then requests are processed with this userid")
 	signed_user_is_optional = flag.Bool("signed_user_is_optional", false, "normally, the header remote userid requires a corresponding signed user header. setting this to true makes it optional (useful for testing, not for production use)")
-	root_dir                = flag.String("git2_git_dir", "/srv/git", "top level directory underwhich git directories are stored. e.g. /srv/git2")
 	http_port               = flag.Int("git2_http_port", 0, "http-server for git2, tcp port")
 	grpc_port               = flag.Int("git2_grpc_port", 0, "grpc-server for git2, tcp port")
 	debug                   = flag.Bool("debug_git2", false, "debug git2 server")
@@ -122,6 +123,8 @@ func (g *GIT2) startHTTPServer() error {
 
 func (g *GIT2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	req := &HTTPRequest{r: r, w: w, git2: g}
+	req.key = utils.RandomString(64)
+	crossprocdata.SaveLocalData(req.key, &crossprocdata.LocalData{HTTPRequest: req})
 	req.ServeHTTP()
 }
 
@@ -132,6 +135,7 @@ type HTTPRequest struct {
 	repo *Repo
 	gurl *GitURL
 	git2 *GIT2
+	key  string
 }
 
 func (h *HTTPRequest) isWrite() bool {
@@ -356,7 +360,7 @@ func (h *HTTPRequest) Printf(format string, args ...interface{}) {
 
 }
 func (h *HTTPRequest) GitRoot() string {
-	return *root_dir
+	return *config.Gitroot
 }
 func (h *HTTPRequest) GetScriptDir() string {
 	sc := h.pwd() + "/scripts"
