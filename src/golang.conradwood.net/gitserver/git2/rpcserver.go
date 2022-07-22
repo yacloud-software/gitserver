@@ -155,6 +155,7 @@ func (g *GIT2) GetReposWithFilter(ctx context.Context, req *gitpb.RepoFilter) (*
 				return g.url_store.ByV2RepositoryID(ctx, sr.ID)
 			})
 			if err != nil {
+				urlCache.Evict(fmt.Sprintf("%d", sr.ID))
 				return nil, err
 			}
 			sr.URLs = uao.([]*gitpb.SourceRepositoryURL)
