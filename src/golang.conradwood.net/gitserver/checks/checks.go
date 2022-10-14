@@ -6,6 +6,7 @@ import (
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/config"
 	"golang.conradwood.net/go-easyops/linux"
+	"golang.conradwood.net/go-easyops/utils"
 	"gopkg.in/yaml.v2"
 	//	"os"
 	"flag"
@@ -23,6 +24,7 @@ type checker struct {
 	oldrev       string
 	newrev       string
 	changedFiles []*ChangedFile
+	removedFiles []*ChangedFile
 }
 type repository struct {
 	SourceRepo *gitpb.SourceRepository
@@ -58,6 +60,20 @@ func (c *checker) OnUpdate(out CheckOutput) error {
 	err := c.readChangedFiles()
 	if err != nil {
 		return err
+	}
+	var ncf []*ChangedFile
+	var nrf []*ChangedFile
+	for _, cf := range c.changedFiles {
+		if utils.FileExists(cf.filename) {
+			ncf = append(ncf, cf)
+		} else {
+			nrf = append(nrf, cf)
+		}
+	}
+	c.changedFiles = ncf
+	c.removedFiles = nrf
+	for _, cf := range c.removedFiles {
+		c.Printf("removed file: \"%s\"\n", cf.filename)
 	}
 	for _, cf := range c.changedFiles {
 		c.Printf("changed file: \"%s\"\n", cf.filename)
