@@ -242,6 +242,15 @@ message HookResponse {
   string Output=2; // send this to client
 }
 
+// data request to update a repo
+message RepoUpdateRequest {
+  SourceRepository Original=1;
+  string Description=2;
+  string AddURLHost=3;
+  string AddURLPath=4;
+}
+
+
 /*
  a new implementation of git server
  Major Differences to GIT1:
@@ -284,6 +293,8 @@ service GIT2 {
   rpc UpdateRepoStatus(UpdateRepoStatusRequest) returns (SourceRepository);
   // run a hook. this is invoked from git:/hooks/[scriptname]->git-hook binary->gRPC and subject to special restrictions,
   rpc RunLocalHook(HookRequest) returns (stream HookResponse);
+  // update git repository
+  rpc GitRepoUpdate(RepoUpdateRequest) returns (SourceRepository);
 }
 
 /*********************************
