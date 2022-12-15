@@ -48,29 +48,14 @@ func (g *GIT2) init() error {
 
 }
 func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepository, error) {
-	u, err := url.Parse(req.URL)
+	sr, err := g.FindRepoByURL(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	path := u.Path
-	path = strings.TrimPrefix(path, "/git/")
-	urls, err := g.url_store.ByPath(ctx, path)
-	if err != nil {
-		return nil, err
+	if !sr.Found {
+		return nil, errors.NotFound(ctx, "repository not found")
 	}
-	host := u.Host
-	id := uint64(0)
-	for _, u := range urls {
-		if u.Host == host {
-			id = u.V2RepositoryID
-		}
-	}
-	if id == 0 {
-		fmt.Printf("Host: \"%s\", Path: \"%s\"\n", host, path)
-		return nil, errors.NotFound(ctx, "no such repo")
-	}
-	r := &gitpb.ByIDRequest{ID: id}
-	return g.RepoByID(ctx, r)
+	return sr.Repository, nil
 }
 func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
 	if !isrepobuilder(ctx) {
@@ -573,4 +558,35 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 		return nil, errors.NotFound(ctx, "no build for repo %d", req.ID)
 	}
 	return builds[0], nil
+}
+func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepositoryResponse, error) {
+	u, err := url.Parse(req.URL)
+	if err != nil {
+		return nil, err
+	}
+	path := u.Path
+	path = strings.TrimPrefix(path, "/git/")
+	urls, err := g.url_store.ByPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	host := u.Host
+	id := uint64(0)
+	for _, u := range urls {
+		if u.Host == host {
+			id = u.V2RepositoryID
+		}
+	}
+	res := &gitpb.SourceRepositoryResponse{Found: false}
+	if id == 0 {
+		fmt.Printf("Host: \"%s\", Path: \"%s\"\n", host, path)
+		return res, nil
+	}
+	r := &gitpb.ByIDRequest{ID: id}
+	repo, err := g.RepoByID(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	res.Repository = repo
+	return res, nil
 }
