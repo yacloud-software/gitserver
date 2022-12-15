@@ -250,7 +250,11 @@ message RepoUpdateRequest {
   string AddURLPath=4;
 }
 
-
+message SourceRepositoryResponse {
+  bool Found=1;
+  SourceRepository Repository=2;
+    
+}
 /*
  a new implementation of git server
  Major Differences to GIT1:
@@ -267,7 +271,7 @@ service GIT2 {
   rpc CheckGitServer(CheckGitRequest) returns (CheckGitResponse);
   // get a repo by ID
   rpc RepoByID(ByIDRequest) returns (SourceRepository);
-  // get a repo by URL
+  // get a repo by URL, error if none found
   rpc RepoByURL(ByURLRequest) returns(SourceRepository);
   // fork a repo, returns ID of new repo
   rpc Fork(ForkRequest) returns (SourceRepository);
@@ -295,6 +299,8 @@ service GIT2 {
   rpc RunLocalHook(HookRequest) returns (stream HookResponse);
   // update git repository
   rpc GitRepoUpdate(RepoUpdateRequest) returns (SourceRepository);
+  // find a repo by URL, return nil if none
+  rpc FindRepoByURL(ByURLRequest) returns(SourceRepositoryResponse);
 }
 
 /*********************************
