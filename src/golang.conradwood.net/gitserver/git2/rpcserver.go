@@ -560,6 +560,7 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 	return builds[0], nil
 }
 func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepositoryResponse, error) {
+	fmt.Printf("Finding repo by url \"%s\"\n", req.URL)
 	u, err := url.Parse(req.URL)
 	if err != nil {
 		return nil, err
@@ -579,7 +580,7 @@ func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*git
 	}
 	res := &gitpb.SourceRepositoryResponse{Found: false}
 	if id == 0 {
-		fmt.Printf("Host: \"%s\", Path: \"%s\"\n", host, path)
+		fmt.Printf("no repo for Host: \"%s\", Path: \"%s\"\n", host, path)
 		return res, nil
 	}
 	r := &gitpb.ByIDRequest{ID: id}
@@ -588,5 +589,7 @@ func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*git
 		return nil, err
 	}
 	res.Repository = repo
+	res.Found = true
+	fmt.Printf("Repo \"%s\" - #%d\n", req.URL, res.Repository.ID)
 	return res, nil
 }
