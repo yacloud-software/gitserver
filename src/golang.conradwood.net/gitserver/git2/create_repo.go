@@ -4,9 +4,9 @@ import (
 	"fmt"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
+	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/linux"
-	"golang.conradwood.net/go-easyops/tokens"
 	"golang.conradwood.net/go-easyops/utils"
 	"os"
 	"time"
@@ -24,7 +24,7 @@ func (h *HTTPRequest) RecreateRepo() {
 		return
 	}
 
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	if crp.Finished != 0 || crp.Success {
 		fmt.Printf("Repolog %d reused. action not taken\n", crp.ID)
 		h.Error(errors.InvalidArgs(ctx, "association token not or no longer valid", "association token refered to log %d which is completed already", crp.ID))
@@ -60,7 +60,7 @@ func (h *HTTPRequest) RecreateRepo() {
 }
 func (h *HTTPRequest) CreateRepo() {
 	crp, err := h.CreateRepoWithError(true)
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		h.Error(err)
@@ -157,7 +157,7 @@ func (h *HTTPRequest) GetCreateLog() (*gitpb.CreateRepoLog, error) {
 	}
 
 	// find access token in db
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	crpx, err := h.git2.repocreatelog_store.ByAssociationToken(ctx, actok)
 	if err != nil {
 		fmt.Printf("Failed to get associationtoken \"%s\" from db: %s\n", actok, err)

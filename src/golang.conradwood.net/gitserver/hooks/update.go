@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 )
 
 /*
@@ -140,7 +141,7 @@ this will be rejected in future versions
 func (u *Update) ChangedFileNames() error {
 	var res []*ChangedFile
 	l := linux.New()
-	l.SetRuntime(15)
+	l.SetMaxRuntime(time.Duration(15) * time.Second)
 	out, err := l.SafelyExecute([]string{"git", "diff", "--name-status", u.oldrev, u.newrev}, nil)
 	if err != nil {
 		fmt.Printf("Git failed. Output:\n%s\n", out)
@@ -227,7 +228,7 @@ func (cf *ChangedFile) GetContent(rev string) (string, error) {
 func exe(com string) (string, error) {
 	fmt.Printf("Executing \"%s\"\n", com)
 	l := linux.New()
-	l.SetRuntime(15)
+	l.SetMaxRuntime(time.Duration(15) * time.Second)
 	cmd := []string{"bash", "-c", com}
 	out, err := l.SafelyExecute(cmd, nil)
 	fmt.Println(out)

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -93,7 +94,7 @@ func (g *Git) Checkout(ctx context.Context, ref string, commit string) error {
 	fmt.Printf("Checking out %s to directory %s\n", g.url, basedir)
 	g.broken = true // if we exit prematurely, it'll be broken
 	l := linux.NewWithContext(ctx)
-	l.SetRuntime(60)
+	l.SetMaxRuntime(time.Duration(60) * time.Second)
 	l.SetAllowConcurrency(true)
 	if g.checkedout == "" {
 		// git clone...

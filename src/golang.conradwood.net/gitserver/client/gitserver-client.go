@@ -7,7 +7,6 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
-	"golang.conradwood.net/go-easyops/tokens"
 	"golang.conradwood.net/go-easyops/utils"
 	"os"
 )
@@ -40,7 +39,7 @@ func main() {
 		Latest()
 		os.Exit(0)
 	}
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	if *check {
 		Check()
 		os.Exit(0)
@@ -94,14 +93,14 @@ func showrepo() {
 }
 
 func Delete() {
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	fr := &pb.ByIDRequest{ID: uint64(*repoid)}
 	_, err := pb.GetGIT2Client().DeleteRepository(ctx, fr)
 	utils.Bail("Failed to delete()", err)
 	fmt.Printf("deleted repository #%d\n", fr.ID)
 }
 func Check() {
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	fr := &pb.CheckGitRequest{Host: *host}
 	cr, err := pb.GetGIT2Client().CheckGitServer(ctx, fr)
 	utils.Bail("Failed to check()", err)
@@ -109,7 +108,7 @@ func Check() {
 }
 
 func Fork() {
-	ctx := tokens.ContextWithToken()
+	ctx := authremote.Context()
 	fr := &pb.ForkRequest{
 		RepositoryID: uint64(*repoid),
 		ArtefactName: *aname,

@@ -8,6 +8,7 @@ import (
 	"golang.conradwood.net/go-easyops/linux"
 	"golang.conradwood.net/go-easyops/utils"
 	"gopkg.in/yaml.v2"
+	"time"
 	//	"os"
 	"flag"
 	"strings"
@@ -124,7 +125,7 @@ func (c *checker) Printf(format string, args ...interface{}) {
 func (c *checker) readChangedFiles() error {
 	var res []*ChangedFile
 	l := linux.New()
-	l.SetRuntime(15)
+	l.SetMaxRuntime(time.Duration(15) * time.Second)
 	out, err := l.SafelyExecuteWithDir([]string{"git", "diff", "--name-status", c.oldrev, c.newrev}, c.GitBareDir(), nil)
 	if err != nil {
 		fmt.Printf("Git failed. Output:\n%s\n", out)
@@ -153,7 +154,7 @@ func (c *checker) readChangedFiles() error {
 func (c *checker) exe(com string) (string, error) {
 	fmt.Printf("Executing \"%s\"\n", com)
 	l := linux.New()
-	l.SetRuntime(15)
+	l.SetMaxRuntime(time.Duration(15) * time.Second)
 	cmd := []string{"bash", "-c", com}
 	out, err := l.SafelyExecuteWithDir(cmd, c.GitBareDir(), nil)
 	if err != nil {
