@@ -83,3 +83,9 @@ func (g *GitTrigger) GetContext() (context.Context, error) {
 func (g *GitTrigger) UserID() string {
 	return g.gitinfo.UserID
 }
+func (g *GitTrigger) NewRev() string {
+	return g.newrev
+}
+func (g *GitTrigger) RepositoryID() uint64 {
+	return g.gitinfo.RepositoryID
+}

@@ -17,14 +17,23 @@ var (
 	def_routing = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
 )
 
+// implementation normally GitTrigger
+type ExternalGitTrigger interface {
+	RepositoryID() uint64
+	GetContext() (context.Context, error)
+	NewRev() string
+	Branch() string
+	UserID() string
+}
+
 // use the gitbuilder service to build instead of locally forking it off
 // e.g. ref== 'master', newrev == commitid
-func external_builder(gt *GitTrigger, w io.Writer) error {
+func external_builder(gt ExternalGitTrigger, w io.Writer) error {
 	ctx, err := gt.GetContext()
 	if err != nil {
 		return err
 	}
-	gi := gt.gitinfo
+	//	gi := gt.gitinfo
 
 	psql, err := sql.Open()
 	if err != nil {
@@ -33,9 +42,9 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 	// create build
 	bdb := db.NewDBBuild(psql)
 	nb := &gitpb.Build{
-		UserID:       gi.UserID,
-		RepositoryID: gi.RepositoryID,
-		CommitHash:   gt.newrev,
+		UserID:       gt.UserID(),
+		RepositoryID: gt.RepositoryID(),
+		CommitHash:   gt.NewRev(),
 		Branch:       gt.Branch(),
 		LogMessage:   "logmessage unavailable", // to get the logmessage we have to check the repo out
 		Timestamp:    uint32(time.Now().Unix()),
@@ -48,11 +57,11 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 	}
 
 	repodb := db.NewDBSourceRepository(psql)
-	repo, err := repodb.ByID(ctx, gi.RepositoryID)
+	repo, err := repodb.ByID(ctx, gt.RepositoryID())
 	if err != nil {
 		return err
 	}
-	urls, err := db.NewDBSourceRepositoryURL(psql).ByV2RepositoryID(ctx, gi.RepositoryID)
+	urls, err := db.NewDBSourceRepositoryURL(psql).ByV2RepositoryID(ctx, gt.RepositoryID())
 	if err != nil {
 		return err
 	}
@@ -64,9 +73,9 @@ func external_builder(gt *GitTrigger, w io.Writer) error {
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
 		GitURL:       url,
-		CommitID:     gt.newrev,
+		CommitID:     gt.NewRev(),
 		BuildNumber:  id,
-		RepositoryID: gi.RepositoryID,
+		RepositoryID: gt.RepositoryID(),
 		RepoName:     repo.ArtefactName,
 		ArtefactName: repo.ArtefactName,
 	}
