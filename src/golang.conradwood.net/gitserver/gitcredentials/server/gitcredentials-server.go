@@ -14,10 +14,12 @@ import (
 )
 
 var (
+	notused   = flag.Bool("server_mode", false, "this flag is not used and here only for compatibility.") // remove asap
 	grpc_port = flag.Int("grpc_port", 4109, "grpc-server for git credentials server")
 )
 
-func StartServer() {
+func main() {
+	flag.Parse()
 	psql, err := sql.Open()
 	gitcreddb = db.NewDBGitCredentials(psql)
 	utils.Bail("failed to create tables", gitcreddb.CreateTable(context.Background()))

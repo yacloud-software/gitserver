@@ -11,7 +11,8 @@ import (
 	"os"
 )
 
-func Client() {
+func main() {
+	flag.Parse()
 	a := &gitpb.GitCredentialsRequest{
 		Args:        flag.Args(),
 		Environment: os.Environ(),
