@@ -159,7 +159,7 @@ func Rebuild() error {
 				fmt.Print(hr.Output)
 			}
 			if hr.ErrorMessage != "" {
-				fmt.Println("************** ERROR\n")
+				fmt.Println("************** ERROR")
 				fmt.Println(hr.ErrorMessage)
 			}
 		}
