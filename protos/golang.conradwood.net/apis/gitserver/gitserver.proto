@@ -301,6 +301,13 @@ service GIT2 {
   rpc GitRepoUpdate(RepoUpdateRequest) returns (SourceRepository);
   // find a repo by URL, return nil if none
   rpc FindRepoByURL(ByURLRequest) returns(SourceRepositoryResponse);
+  /*
+    rebuild - this does not necessarily mean the result can be stored in the build repo archive though
+    The "Rebuild" will attempt to store the result in the buildrepository under the Named BuildID. The
+    Build Repository will - normally - reject this (builds are immutable). This can, however, be useful to 
+    verify if configuration changes on the buildserver result in a successful build.
+  */
+  rpc Rebuild(ByIDRequest) returns (stream HookResponse);
 }
 
 /*********************************
