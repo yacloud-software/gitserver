@@ -156,6 +156,27 @@ func (a *DBRepository) ByID(ctx context.Context, p uint64) (*savepb.Repository, 
 	return l[0], nil
 }
 
+// get it by primary id (nil if no such ID row, but no error either)
+func (a *DBRepository) TryByID(ctx context.Context, p uint64) (*savepb.Repository, error) {
+	qn := "DBRepository_TryByID"
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,reponame, ownerid, artefactname from "+a.SQLTablename+" where id = $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error querying (%s)", e))
+	}
+	defer rows.Close()
+	l, e := a.FromRows(ctx, rows)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error scanning (%s)", e))
+	}
+	if len(l) == 0 {
+		return nil, nil
+	}
+	if len(l) != 1 {
+		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) Repository with id %v", len(l), p))
+	}
+	return l[0], nil
+}
+
 // get all rows
 func (a *DBRepository) All(ctx context.Context) ([]*savepb.Repository, error) {
 	qn := "DBRepository_all"

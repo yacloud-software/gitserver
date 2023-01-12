@@ -7,8 +7,11 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/ctx"
 	"golang.conradwood.net/go-easyops/utils"
+	"io"
 	"os"
+	"time"
 )
 
 var (
@@ -27,10 +30,15 @@ var (
 	getrepo     = flag.Bool("info", false, "if true get repo information (requires repoid)")
 	debug       = flag.Bool("debug", false, "debug mode")
 	builds      = flag.Bool("builds", false, "do builds")
+	rebuild     = flag.Uint64("rebuild", 0, "trigger a build")
 )
 
 func main() {
 	flag.Parse()
+	if *rebuild != 0 {
+		utils.Bail("rebuild failed", Rebuild())
+		os.Exit(0)
+	}
 	if *builds {
 		DoBuilds()
 		os.Exit(0)
@@ -132,4 +140,35 @@ func Create() {
 	rl, err := pb.GetGIT2Client().CreateRepo(ctx, fr)
 	utils.Bail("Failed to create repo", err)
 	fmt.Printf("Created repository: %d at https://%s/%s\n", rl.ID, url.Host, url.Path)
+}
+
+func Rebuild() error {
+	u, _ := authremote.GetLocalUsers()
+	cb := ctx.NewContextBuilder()
+	cb.WithUser(u)
+	cb.WithTimeout(time.Duration(60) * time.Minute)
+	ctx := cb.ContextWithAutoCancel()
+	rl, err := pb.GetGIT2Client().Rebuild(ctx, &pb.ByIDRequest{ID: *rebuild})
+	if err != nil {
+		return err
+	}
+	for {
+		hr, err := rl.Recv()
+		if hr != nil {
+			if hr.Output != "" {
+				fmt.Print(hr.Output)
+			}
+			if hr.ErrorMessage != "" {
+				fmt.Println("************** ERROR\n")
+				fmt.Println(hr.ErrorMessage)
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

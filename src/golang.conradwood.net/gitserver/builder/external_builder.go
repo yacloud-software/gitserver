@@ -20,19 +20,79 @@ var (
 // implementation normally GitTrigger
 type ExternalGitTrigger interface {
 	RepositoryID() uint64
-	GetContext() (context.Context, error)
 	NewRev() string
 	Branch() string
 	UserID() string
 }
 
+func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint64, w io.Writer) (*gitbuilder.BuildResponse, error) {
+	repo, err := db.DefaultDBSourceRepository().ByID(ctx, gt.RepositoryID())
+	if err != nil {
+		return nil, err
+	}
+
+	urls, err := db.DefaultDBSourceRepositoryURL().ByV2RepositoryID(ctx, gt.RepositoryID())
+	if err != nil {
+		return nil, err
+	}
+	if len(urls) == 0 {
+		return nil, fmt.Errorf("Repository %d (%s) has no urls\n", repo.ID, repo.ArtefactName)
+	}
+	url := fmt.Sprintf("https://%s/git/%s", urls[0].Host, urls[0].Path)
+
+	gb := gitbuilder.GetGitBuilderClient()
+	br := &gitbuilder.BuildRequest{
+		GitURL:       url,
+		CommitID:     gt.NewRev(),
+		BuildNumber:  buildid,
+		RepositoryID: gt.RepositoryID(),
+		RepoName:     repo.ArtefactName,
+		ArtefactName: repo.ArtefactName,
+	}
+	// might have to add special routing tags to context to route it to a SPECIFIC builder
+	rm := make(map[string]string)
+	if repo.BuildRoutingTagName != "" && repo.BuildRoutingTagValue != "" {
+		rm[repo.BuildRoutingTagName] = repo.BuildRoutingTagValue
+	} else {
+		if *def_routing {
+			rm["provides"] = "default"
+		}
+	}
+	ctx = authremote.DerivedContextWithRouting(ctx, rm, true)
+	cl, err := gb.Build(ctx, br)
+	if err != nil {
+		return nil, err
+	}
+	var lastResponse *gitbuilder.BuildResponse
+	for {
+		res, err := cl.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if res.Complete {
+			lastResponse = res
+		}
+		if len(res.Stdout) != 0 {
+			_, err = w.Write(res.Stdout)
+			if err != nil {
+				return lastResponse, err
+			}
+		}
+	}
+
+	if lastResponse == nil || !lastResponse.Success {
+		return lastResponse, fmt.Errorf("build failed (%s)", lastResponse.ResultMessage)
+	}
+	return lastResponse, nil
+
+}
+
 // use the gitbuilder service to build instead of locally forking it off
 // e.g. ref== 'master', newrev == commitid
-func external_builder(gt ExternalGitTrigger, w io.Writer) error {
-	ctx, err := gt.GetContext()
-	if err != nil {
-		return err
-	}
+func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) error {
 	//	gi := gt.gitinfo
 
 	psql, err := sql.Open()
@@ -61,6 +121,8 @@ func external_builder(gt ExternalGitTrigger, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	//run external builder..
 	urls, err := db.NewDBSourceRepositoryURL(psql).ByV2RepositoryID(ctx, gt.RepositoryID())
 	if err != nil {
 		return err

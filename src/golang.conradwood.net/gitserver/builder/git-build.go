@@ -10,7 +10,7 @@ import (
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/gitserver/git"
-	"golang.conradwood.net/gitserver/git2"
+	//"golang.conradwood.net/gitserver/git2"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/sql"
@@ -475,9 +475,11 @@ func (b *BuildRepo) ArtefactName() string {
 	return b.artefactname
 }
 
-/**************************************************
+/*
+*************************************************
 create a new build
-/*************************************************/
+/************************************************
+*/
 func (b *Builder) Build() *gitpb.Build {
 	return b.buildv2
 }
@@ -485,7 +487,7 @@ func (b *Builder) Build() *gitpb.Build {
 // creates new builds, v2
 func (b *Builder) CreateBuild() error {
 	// create v2
-	bdb := db.NewDBBuild(git2.GetDatabase())
+	bdb := db.DefaultDBBuild()
 	nb := &gitpb.Build{
 		UserID:       b.trigger.UserID(),
 		RepositoryID: b.repository.GetID(),
@@ -509,7 +511,7 @@ func (b *Builder) CreateBuild() error {
 // updates both builds, v1 and v2
 func (b *Builder) updateBuild() error {
 	//v2
-	bdb := db.NewDBBuild(git2.GetDatabase())
+	bdb := db.DefaultDBBuild()
 	b.buildv2.Success = true
 	err := bdb.Update(context.Background(), b.buildv2)
 	if err != nil {

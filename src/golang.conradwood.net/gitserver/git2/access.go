@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/apis/objectauth"
 	"golang.conradwood.net/go-easyops/auth"
+	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/utils"
 )
 
@@ -14,6 +16,33 @@ var (
 	REPOBUILDER_READ     = []uint64{64}
 	disable_access_check = flag.Bool("disable_access_check", false, "if true, allow all access")
 )
+
+// nil if ok
+func wantRepoAccess(ctx context.Context, repo *gitpb.SourceRepository, writereq bool) error {
+	objauth := objectauth.GetObjectAuthClient()
+	ar, err := objauth.AskObjectAccess(ctx, &objectauth.AuthRequest{
+		ObjectType: objectauth.OBJECTTYPE_GitRepository,
+		ObjectID:   repo.ID,
+	})
+
+	if err != nil {
+		fmt.Printf("Failed to get object access: %s\n", utils.ErrorString(err))
+		return err
+	}
+
+	p := ar.Permissions
+	if writereq {
+		if p.Write && p.Read && p.View {
+			return nil
+		}
+	} else {
+		if p.Read && p.View {
+			return nil
+		}
+	}
+
+	return errors.AccessDenied(ctx, "access to repo %d (%s) denied", repo.ID, repo.ArtefactName)
+}
 
 // allows access to the user "by objectauth"
 // allows access to repos for repobuilder if repo is not complete yet

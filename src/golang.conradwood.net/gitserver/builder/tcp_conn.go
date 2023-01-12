@@ -51,11 +51,16 @@ func (t *TCPConn) HandleConnection() {
 		t.Printf("Failed to parse git trigger: %s\n", utils.ErrorString(err))
 		return
 	}
+	ctx, err := gt.GetContext()
+	if err != nil {
+		t.Printf("Failed to get context: %s\n", err)
+		return
+	}
 	if *use_external_builder {
 		if !*run_scripts {
 			t.Writeln("Builds disabled.\n")
 		} else {
-			err = external_builder(gt, t)
+			err = external_builder(ctx, gt, t)
 		}
 	} else {
 		err = t.build(gt)
