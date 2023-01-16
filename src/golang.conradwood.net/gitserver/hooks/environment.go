@@ -19,7 +19,7 @@ func Setup() *Environment {
 	tokens.DisableUserToken()
 	res := &Environment{}
 	/*
-		res.ctx = tokens.ContextWithToken()
+		res.ctx = authremote.Context()
 		res.ctx = authremote.Context()
 	*/
 	res.ctx = authremote.Context()

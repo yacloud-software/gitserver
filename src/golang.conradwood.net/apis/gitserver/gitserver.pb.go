@@ -1519,7 +1519,11 @@ type GIT2Client interface {
 	GitRepoUpdate(ctx context.Context, in *RepoUpdateRequest, opts ...grpc.CallOption) (*SourceRepository, error)
 	// find a repo by URL, return nil if none
 	FindRepoByURL(ctx context.Context, in *ByURLRequest, opts ...grpc.CallOption) (*SourceRepositoryResponse, error)
+	//
 	// rebuild - this does not necessarily mean the result can be stored in the build repo archive though
+	// The "Rebuild" will attempt to store the result in the buildrepository under the Named BuildID. The
+	// Build Repository will - normally - reject this (builds are immutable). This can, however, be useful to
+	// verify if configuration changes on the buildserver result in a successful build.
 	Rebuild(ctx context.Context, in *ByIDRequest, opts ...grpc.CallOption) (GIT2_RebuildClient, error)
 }
 
@@ -1776,7 +1780,11 @@ type GIT2Server interface {
 	GitRepoUpdate(context.Context, *RepoUpdateRequest) (*SourceRepository, error)
 	// find a repo by URL, return nil if none
 	FindRepoByURL(context.Context, *ByURLRequest) (*SourceRepositoryResponse, error)
+	//
 	// rebuild - this does not necessarily mean the result can be stored in the build repo archive though
+	// The "Rebuild" will attempt to store the result in the buildrepository under the Named BuildID. The
+	// Build Repository will - normally - reject this (builds are immutable). This can, however, be useful to
+	// verify if configuration changes on the buildserver result in a successful build.
 	Rebuild(*ByIDRequest, GIT2_RebuildServer) error
 }
 

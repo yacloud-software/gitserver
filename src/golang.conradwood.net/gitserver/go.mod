@@ -1,6 +1,6 @@
 module golang.conradwood.net/gitserver
 
-go 1.17
+go 1.18
 
 require (
 	golang.conradwood.net/apis/auth v1.1.2073
@@ -9,7 +9,7 @@ require (
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.1932
 	golang.conradwood.net/apis/slackgateway v1.1.1932
-	golang.conradwood.net/go-easyops v0.1.15252
+	golang.conradwood.net/go-easyops v0.1.15322
 	golang.org/x/sys v0.3.0
 	google.golang.org/grpc v1.51.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -40,7 +40,7 @@ require (
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.yacloud.eu/apis/urlcacher v1.1.2073 // indirect
-	google.golang.org/genproto v0.0.0-20220921223823-23cae91e6737 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
 
