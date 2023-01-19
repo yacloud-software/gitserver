@@ -24,7 +24,7 @@ import (
 const (
 	REPO_SERVICE_ID    = "3539"
 	WEB_SERVICE_ID     = "145"
-	GOTOOLS_SERVICE_ID = ""
+	GOTOOLS_SERVICE_ID = "254"
 )
 
 var (
