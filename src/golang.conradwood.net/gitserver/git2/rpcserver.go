@@ -24,7 +24,7 @@ import (
 const (
 	REPO_SERVICE_ID    = "3539"
 	WEB_SERVICE_ID     = "145"
-	GOTOOLS_SERVICE_ID = "254"
+	GOTOOLS_SERVICE_ID = "42195"
 )
 
 var (
@@ -529,8 +529,8 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 }
 func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
 	check_user := true
-	err := errors.NeedServiceOrRoot(ctx, []string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID})
-	if err == nil {
+	serr := errors.NeedServiceOrRoot(ctx, []string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID})
+	if serr == nil {
 		check_user = false
 	}
 
