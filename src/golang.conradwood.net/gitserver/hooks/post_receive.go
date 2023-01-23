@@ -53,7 +53,7 @@ func (p *PostReceive) Process(e *Environment) error {
 	// this really should be a streaming grpc service
 	tcp_port, err := strconv.Atoi(os.Getenv("GITSERVER_TCP_PORT"))
 	if err != nil {
-		fmt.Printf("tcpport in environemnt invalid (using default): %s\n", err)
+		fmt.Printf("tcpport in environment invalid (using default): %s\n", err)
 	}
 	if tcp_port == 0 {
 		tcp_port = GITSERVER_TCP_PORT

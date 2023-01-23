@@ -6,6 +6,7 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	//	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/cmdline"
 	"golang.conradwood.net/go-easyops/rpc"
 	"golang.conradwood.net/go-easyops/utils"
 	"strings"
@@ -65,6 +66,9 @@ func (g *GitTrigger) GetContext() (context.Context, error) {
 	ctx, err := authremote.ContextForUserWithTimeout(user, LONG_RUNNING_SECS) // used for git clone stuff too
 	if err != nil {
 		return nil, err
+	}
+	if cmdline.ContextWithBuilder() {
+		return ctx, nil
 	}
 	cs := rpc.CallStateFromContext(ctx)
 	if cs == nil {
