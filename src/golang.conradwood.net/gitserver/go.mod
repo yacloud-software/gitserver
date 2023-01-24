@@ -9,7 +9,7 @@ require (
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.2124
 	golang.conradwood.net/apis/slackgateway v1.1.2124
-	golang.conradwood.net/go-easyops v0.1.15691
+	golang.conradwood.net/go-easyops v0.1.15769
 	golang.org/x/sys v0.4.0
 	google.golang.org/grpc v1.52.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -30,7 +30,7 @@ require (
 	golang.conradwood.net/apis/autodeployer v1.1.2124 // indirect
 	golang.conradwood.net/apis/deploymonkey v1.1.2124 // indirect
 	golang.conradwood.net/apis/echoservice v1.1.2124 // indirect
-	golang.conradwood.net/apis/errorlogger v1.1.2124 // indirect
+	golang.conradwood.net/apis/errorlogger v1.1.2125 // indirect
 	golang.conradwood.net/apis/framework v1.1.2124 // indirect
 	golang.conradwood.net/apis/goeasyops v1.1.2124 // indirect
 	golang.conradwood.net/apis/h2gproxy v1.1.2124 // indirect
