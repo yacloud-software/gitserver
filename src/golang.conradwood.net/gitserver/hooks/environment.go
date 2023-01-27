@@ -25,7 +25,7 @@ func Setup() *Environment {
 		c, err := ctx.DeserialiseContextFromString(cs)
 		if err != nil {
 			fmt.Printf("Failed to deserialise context: %s\n", err)
-			os.Exit(10)
+			c = authremote.Context() // try old way
 		}
 		res.ctx = c
 	} else {
