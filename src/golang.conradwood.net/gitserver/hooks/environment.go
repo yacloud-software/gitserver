@@ -6,6 +6,7 @@ import (
 	apb "golang.conradwood.net/apis/auth"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/ctx"
 	"golang.conradwood.net/go-easyops/tokens"
 	"os"
 )
@@ -18,11 +19,19 @@ type Environment struct {
 func Setup() *Environment {
 	tokens.DisableUserToken()
 	res := &Environment{}
-	/*
+
+	cs := os.Getenv("GE_CTX")
+	if cs != "" {
+		c, err := ctx.DeserialiseContextFromString(cs)
+		if err != nil {
+			fmt.Printf("Failed to deserialise context: %s\n", err)
+			os.Exit(10)
+		}
+		res.ctx = c
+	} else {
 		res.ctx = authremote.Context()
-		res.ctx = authremote.Context()
-	*/
-	res.ctx = authremote.Context()
+	}
+
 	res.CurrentUser = auth.GetUser(res.ctx)
 	if res.CurrentUser == nil {
 		fmt.Printf("Environment Variable GE_CTX:\n\"%s\"\n", os.Getenv("GE_CTX"))

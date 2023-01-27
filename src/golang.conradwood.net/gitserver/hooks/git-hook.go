@@ -16,6 +16,7 @@ var (
 
 func main() {
 	flag.Parse()
+
 	var err error
 	ev := Setup()
 	fmt.Printf("=== Git Hook started: \"%s\"\n", *hook_type)

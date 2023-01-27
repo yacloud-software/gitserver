@@ -3,9 +3,11 @@ package git2
 import (
 	"flag"
 	"fmt"
+	"golang.conradwood.net/go-easyops/cmdline"
 	"golang.conradwood.net/go-easyops/utils"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
+	"strings"
 )
 
 var (
@@ -23,10 +25,10 @@ func (h *HTTPRequest) fixHooks() error {
 }
 
 /*
- we write a script here to
- 1) set the hook_type to the name of hook being executed
- 2) set path to current gitserver path
- TODO: use symlink (and os.Args[0]) instead?
+we write a script here to
+1) set the hook_type to the name of hook being executed
+2) set path to current gitserver path
+TODO: use symlink (and os.Args[0]) instead?
 */
 func (h *HTTPRequest) writeHook(enable bool, name string) error {
 	hook_binaries := []string{
@@ -48,8 +50,15 @@ func (h *HTTPRequest) writeHook(enable bool, name string) error {
 		panic("Hook binary (git-hook) not found")
 	}
 	var content string
-
-	content = fmt.Sprintf("#!/bin/sh\nexec %s -hook_type=%s $@\n", hook_binary, name)
+	var extra_paras []string
+	if cmdline.ContextWithBuilder() {
+		extra_paras = append(extra_paras, "-ge_context_with_builder")
+	}
+	extra_paras_s := ""
+	if len(extra_paras) > 0 {
+		extra_paras_s = strings.Join(extra_paras, " ")
+	}
+	content = fmt.Sprintf("#!/bin/sh\nexec %s -hook_type=%s %s $@\n", hook_binary, name, extra_paras_s)
 	if !enable {
 		content = "#!/bin/sh"
 	}
