@@ -142,9 +142,10 @@ func (u *Update) ChangedFileNames() error {
 	var res []*ChangedFile
 	l := linux.New()
 	l.SetMaxRuntime(time.Duration(15) * time.Second)
+	fmt.Printf("Running diff to find changed filenames...\n")
 	out, err := l.SafelyExecute([]string{"git", "diff", "--name-status", u.oldrev, u.newrev}, nil)
 	if err != nil {
-		fmt.Printf("Git failed. Output:\n%s\n", out)
+		fmt.Printf("Git diff %s %s failed. Output:\n%s\n", u.oldrev, u.newrev, out)
 		return err
 	}
 	for _, line := range strings.Split(out, "\n") {
