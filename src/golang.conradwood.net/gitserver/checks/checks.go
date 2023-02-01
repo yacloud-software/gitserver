@@ -117,6 +117,7 @@ func (c *checker) Printf(format string, args ...interface{}) {
 		return
 	}
 	s := fmt.Sprintf(format, args...)
+	fmt.Print("[checker] " + s)
 	hr := &gitpb.HookResponse{Output: "[srvhook] " + s}
 	c.out.Send(hr)
 }
