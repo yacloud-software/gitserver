@@ -25,13 +25,14 @@ the post-receive uses a dodgy tcp protocol to call into the server
 the update hook currently runs within the "git" process space, but an experimental implementation
 to run via gRPC on the local gitserver is implemented in update.go (disabled by default)
 
-
-
-
-
-
-
-
+--- a typical /etc/gitconfig looks like this --
+[credential]
+        helper="/usr/local/bin/gitcredentials-client -registry=registry"
+        useHttpPath = true
+[pull]
+        rebase = false
+[safe]
+        directory = *
 
 
 
