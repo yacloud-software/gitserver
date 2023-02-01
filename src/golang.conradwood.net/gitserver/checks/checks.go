@@ -126,9 +126,10 @@ func (c *checker) readChangedFiles() error {
 	var res []*ChangedFile
 	l := linux.New()
 	l.SetMaxRuntime(time.Duration(15) * time.Second)
+	c.Printf("Getting diff between \"%s\" and \"%s\" in directory \"%s\"\n", c.oldrev, c.newrev, c.GitBareDir())
 	out, err := l.SafelyExecuteWithDir([]string{"git", "diff", "--name-status", c.oldrev, c.newrev}, c.GitBareDir(), nil)
 	if err != nil {
-		fmt.Printf("Git failed. Output:\n%s\n", out)
+		fmt.Printf("Git diff failed. Output:\n%s\n", out)
 		return err
 	}
 	for _, line := range strings.Split(out, "\n") {
