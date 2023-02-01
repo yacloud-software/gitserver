@@ -22,9 +22,15 @@ func Setup() *Environment {
 
 	cs := os.Getenv("GE_CTX")
 	if cs != "" {
-		c, err := ctx.DeserialiseContextFromString(cs)
-		if err != nil {
-			fmt.Printf("Failed to deserialise context: %s\n", err)
+		var c context.Context
+		var err error
+		if ctx.IsSerialisedByBuilder([]byte(cs)) {
+			c, err = ctx.DeserialiseContextFromString(cs)
+			if err != nil {
+				fmt.Printf("Failed to deserialise context (will try 'old' method): %s\n", err)
+				c = authremote.Context() // try old way
+			}
+		} else {
 			c = authremote.Context() // try old way
 		}
 		res.ctx = c
