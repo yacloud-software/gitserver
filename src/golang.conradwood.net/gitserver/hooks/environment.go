@@ -8,6 +8,7 @@ import (
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/ctx"
 	"golang.conradwood.net/go-easyops/tokens"
+	"golang.conradwood.net/go-easyops/utils"
 	"os"
 )
 
@@ -37,7 +38,9 @@ func parseContextFromEnv(env string) context.Context {
 
 	var c context.Context
 	var err error
-	if ctx.IsSerialisedByBuilder([]byte(env)) {
+	b := []byte(env)
+	fmt.Printf("[hook] Context: %s\n", utils.HexStr(b[:15]))
+	if ctx.IsSerialisedByBuilder(b) {
 		c, err = ctx.DeserialiseContextFromString(env)
 		if err == nil {
 			return c
