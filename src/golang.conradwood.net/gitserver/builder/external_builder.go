@@ -7,7 +7,9 @@ import (
 	"golang.conradwood.net/apis/gitbuilder"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
+	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/sql"
 	"io"
 	"time"
@@ -59,6 +61,10 @@ func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint
 		}
 	}
 	ctx = authremote.DerivedContextWithRouting(ctx, rm, true)
+	u := auth.GetUser(ctx)
+	if u == nil {
+		return nil, errors.Unauthenticated(ctx, "no user for builder")
+	}
 	cl, err := gb.Build(ctx, br)
 	if err != nil {
 		return nil, err

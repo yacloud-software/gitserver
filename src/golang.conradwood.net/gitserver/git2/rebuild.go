@@ -51,6 +51,13 @@ func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) err
 	if err != nil {
 		return err
 	}
+	if !build.Success {
+		build.Success = true
+		err = db.DefaultDBBuild().Update(ctx, build)
+		if err != nil {
+			fmt.Printf("Warning - failed to update last build status in database from failed to success\n")
+		}
+	}
 	return nil
 }
 

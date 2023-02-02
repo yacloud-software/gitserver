@@ -9,7 +9,7 @@ require (
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.2138
 	golang.conradwood.net/apis/slackgateway v1.1.2138
-	golang.conradwood.net/go-easyops v0.1.15968
+	golang.conradwood.net/go-easyops v0.1.15973
 	golang.org/x/sys v0.4.0
 	google.golang.org/grpc v1.52.0
 	gopkg.in/yaml.v2 v2.4.0
