@@ -27,7 +27,7 @@ func Setup() *Environment {
 		if ctx.IsSerialisedByBuilder([]byte(cs)) {
 			c, err = ctx.DeserialiseContextFromString(cs)
 			if err != nil {
-				fmt.Printf("Failed to deserialise context (will try 'old' method): %s\n", err)
+				fmt.Printf("[hook] Failed to deserialise context (will try 'old' method): %s\n", err)
 				c = authremote.Context() // try old way
 			}
 		} else {
@@ -40,9 +40,9 @@ func Setup() *Environment {
 
 	res.CurrentUser = auth.GetUser(res.ctx)
 	if res.CurrentUser == nil {
-		fmt.Printf("Environment Variable GE_CTX:\n\"%s\"\n", os.Getenv("GE_CTX"))
+		fmt.Printf("[hook] Environment Variable GE_CTX:\n\"%s\"\n", os.Getenv("GE_CTX"))
 	}
-	fmt.Printf("Current user: %s\n", auth.CurrentUserString(res.ctx))
+	fmt.Printf("[hook] Current user: %s\n", auth.CurrentUserString(res.ctx))
 	return res
 }
 
