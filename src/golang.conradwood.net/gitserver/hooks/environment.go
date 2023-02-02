@@ -31,6 +31,7 @@ func Setup() *Environment {
 }
 func parseContextFromEnv(env string) context.Context {
 	if env == "" {
+		fmt.Printf("[hook] WARNING no serialised context in git hook\n")
 		return authremote.Context()
 	}
 
