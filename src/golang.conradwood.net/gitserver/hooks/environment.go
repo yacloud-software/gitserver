@@ -39,7 +39,7 @@ func parseContextFromEnv(env string) context.Context {
 	var c context.Context
 	var err error
 	b := []byte(env)
-	fmt.Printf("[hook] Context: %s\n", utils.HexStr(b[:15]))
+	fmt.Printf("[hook] Context: %s (%s)\n", utils.HexStr(b[:15]), string(b[:15]))
 	if ctx.IsSerialisedByBuilder(b) {
 		c, err = ctx.DeserialiseContextFromString(env)
 		if err == nil {
