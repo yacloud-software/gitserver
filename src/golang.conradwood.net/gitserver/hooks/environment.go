@@ -21,29 +21,31 @@ func Setup() *Environment {
 	res := &Environment{}
 
 	cs := os.Getenv("GE_CTX")
-	if cs != "" {
-		var c context.Context
-		var err error
-		if ctx.IsSerialisedByBuilder([]byte(cs)) {
-			c, err = ctx.DeserialiseContextFromString(cs)
-			if err != nil {
-				fmt.Printf("[hook] Failed to deserialise context (will try 'old' method): %s\n", err)
-				c = authremote.Context() // try old way
-			}
-		} else {
-			c = authremote.Context() // try old way
-		}
-		res.ctx = c
-	} else {
-		res.ctx = authremote.Context()
-	}
-
+	res.ctx = parseContextFromEnv(cs)
 	res.CurrentUser = auth.GetUser(res.ctx)
+	fmt.Printf("[hook] Current user: %s\n", auth.CurrentUserString(res.ctx))
 	if res.CurrentUser == nil {
 		fmt.Printf("[hook] Environment Variable GE_CTX:\n\"%s\"\n", os.Getenv("GE_CTX"))
 	}
-	fmt.Printf("[hook] Current user: %s\n", auth.CurrentUserString(res.ctx))
 	return res
+}
+func parseContextFromEnv(env string) context.Context {
+	if env == "" {
+		return authremote.Context()
+	}
+
+	var c context.Context
+	var err error
+	if ctx.IsSerialisedByBuilder([]byte(env)) {
+		c, err = ctx.DeserialiseContextFromString(env)
+		if err == nil {
+			return c
+		}
+		fmt.Printf("[hook] failed to deserialise builder context (%s)\n", err)
+	}
+	c = authremote.Context() // try old way
+	return c
+
 }
 
 func (e *Environment) IsRoot() bool {
