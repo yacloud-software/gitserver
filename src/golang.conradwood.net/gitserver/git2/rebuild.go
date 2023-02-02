@@ -42,6 +42,7 @@ func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) err
 		newrev: build.CommitHash,
 		branch: build.Branch,
 	}
+	fmt.Printf("Rebuilding Build #%d for user \"%s\"\n", buildid, auth.UserIDString(user))
 	lr, err := builder.RunExternalBuilder(ctx, rt, build.ID, w)
 	if lr != nil {
 		fmt.Printf("Last response: %s\n", lr.ResultMessage)
@@ -50,7 +51,6 @@ func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) err
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Rebuilding Build #%d for user \"%s\"\n", buildid, auth.UserIDString(user))
 	return nil
 }
 
