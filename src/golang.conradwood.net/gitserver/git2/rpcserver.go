@@ -60,7 +60,7 @@ func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.S
 }
 func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
 	if !isrepobuilder(ctx) {
-		fmt.Printf("Getting repo by id %d\n", req.ID)
+		//fmt.Printf("Getting repo by id %d\n", req.ID)
 		ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
 		ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
 		if err != nil {
@@ -109,7 +109,7 @@ func (g *GIT2) GetReposWithFilter(ctx context.Context, req *gitpb.RepoFilter) (*
 	if u == nil {
 		return nil, errors.Unauthenticated(ctx, "no user: no repos")
 	}
-	fmt.Printf("GetRepos() - got %d repos\n", len(repos))
+	//	fmt.Printf("GetRepos() - got %d repos\n", len(repos))
 	res := &gitpb.SourceRepositoryList{}
 	ot := &oa.ObjectType{ObjectType: oa.OBJECTTYPE_GitRepository}
 	ol, err := oa.GetObjectAuthClient().AvailableObjects(ctx, ot)
@@ -147,7 +147,7 @@ func (g *GIT2) GetReposWithFilter(ctx context.Context, req *gitpb.RepoFilter) (*
 			sr.URLs = uao.([]*gitpb.SourceRepositoryURL)
 		}
 	}
-	fmt.Printf("GetRepos() - returning %d repos to user %s (%s)\n", len(res.Repos), auth.Description(u), u.ID)
+	//fmt.Printf("GetRepos() - returning %d repos to user %s (%s)\n", len(res.Repos), auth.Description(u), u.ID)
 	sort.Slice(res.Repos, func(i, j int) bool {
 		return res.Repos[i].ID < res.Repos[j].ID
 	})
@@ -561,7 +561,7 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 	return builds[0], nil
 }
 func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepositoryResponse, error) {
-	fmt.Printf("Finding repo by url \"%s\"\n", req.URL)
+	//fmt.Printf("Finding repo by url \"%s\"\n", req.URL)
 	u, err := url.Parse(req.URL)
 	if err != nil {
 		return nil, err
@@ -581,7 +581,7 @@ func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*git
 	}
 	res := &gitpb.SourceRepositoryResponse{Found: false}
 	if id == 0 {
-		fmt.Printf("no repo for Host: \"%s\", Path: \"%s\"\n", host, path)
+		//		fmt.Printf("no repo for Host: \"%s\", Path: \"%s\"\n", host, path)
 		return res, nil
 	}
 	r := &gitpb.ByIDRequest{ID: id}
@@ -591,6 +591,6 @@ func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*git
 	}
 	res.Repository = repo
 	res.Found = true
-	fmt.Printf("Repo \"%s\" - #%d\n", req.URL, res.Repository.ID)
+	//	fmt.Printf("Repo \"%s\" - #%d\n", req.URL, res.Repository.ID)
 	return res, nil
 }
