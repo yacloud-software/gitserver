@@ -105,6 +105,8 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 	fmt.Printf("Creating Repository %d\n", crp.RepositoryID)
 	ctx, err := auth.RecreateContextWithTimeout(time.Duration(5)*time.Minute, []byte(crp.Context))
 	if err != nil {
+		utils.PrintStack("invalid context")
+		fmt.Println(utils.Hexdump("context", []byte(crp.Context)))
 		fmt.Printf("Context is not valid: %s\n", err)
 		return crp, err
 	}
