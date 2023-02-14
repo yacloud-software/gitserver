@@ -3,7 +3,7 @@ package git2
 import (
 	"flag"
 	"fmt"
-	"golang.conradwood.net/go-easyops/cmdline"
+	//	"golang.conradwood.net/go-easyops/cmdline"
 	"golang.conradwood.net/go-easyops/utils"
 	"golang.org/x/sys/unix"
 	"io/ioutil"
@@ -51,9 +51,7 @@ func (h *HTTPRequest) writeHook(enable bool, name string) error {
 	}
 	var content string
 	var extra_paras []string
-	if cmdline.ContextWithBuilder() {
-		extra_paras = append(extra_paras, "-ge_context_with_builder")
-	}
+
 	extra_paras_s := ""
 	if len(extra_paras) > 0 {
 		extra_paras_s = strings.Join(extra_paras, " ")
