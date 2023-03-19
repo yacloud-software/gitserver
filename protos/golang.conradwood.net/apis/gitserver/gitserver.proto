@@ -6,14 +6,19 @@ option java_package = "net.conradwood.golang.apis.gitserver";
 import "golang.conradwood.net/apis/common/common.proto";
 import "golang.conradwood.net/apis/auth/auth.proto";
 
+/*
+ SC_FIRMWARE_XXX means the main singingcat 'kernel' running on cpu XXX
+ note that a repo can have multiple tags, for example an SC_APP_XXX can be compiled from the same source in a repo
+*/
 enum REPOTAG {
   UNDEFINED=0;
-  FIRMWARE=1;
-  LOADER=2;
-  FIRMWARE_APP=3;
+  SC_FIRMWARE_STM32L15X=1; // main cpu: stm32l15x
+  SC_LOADER_STM32L15X=2; // loader for stm32l15x
+  SC_APP_STM32_L15X=3; 
   ESP8266_AS_COPROCESSOR=4; // esp8266 as coprocessor to, e.g. stm32151
   ESP32_AS_COPROCESSOR=5; // esp32 as coprocessor to, e.g. stm32151
-  ESP32_AS_MAIN_PROCESSOR=6; // esp32 main cpu
+  SC_FIRMWARE_ESP32=6; // esp32 main cpu
+  SC_APP_ESP32=7; // the app on an esp32 
 }
 
 message GitCredentials {
