@@ -11,6 +11,9 @@ enum REPOTAG {
   FIRMWARE=1;
   LOADER=2;
   FIRMWARE_APP=3;
+  ESP8266_AS_COPROCESSOR=4; // esp8266 as coprocessor to, e.g. stm32151
+  ESP32_AS_COPROCESSOR=5; // esp32 as coprocessor to, e.g. stm32151
+  ESP32_AS_MAIN_PROCESSOR=6; // esp32 main cpu
 }
 
 message GitCredentials {
