@@ -14,7 +14,7 @@ enum REPOTAG {
   UNDEFINED=0;
   SC_FIRMWARE_STM32L15X=1; // main cpu: stm32l15x
   SC_LOADER_STM32L15X=2; // loader for stm32l15x
-  SC_APP_STM32_L15X=3; 
+  SC_APP_STM32L15X=3; 
   ESP8266_AS_COPROCESSOR=4; // esp8266 as coprocessor to, e.g. stm32151
   ESP32_AS_COPROCESSOR=5; // esp32 as coprocessor to, e.g. stm32151
   SC_FIRMWARE_ESP32=6; // esp32 main cpu
