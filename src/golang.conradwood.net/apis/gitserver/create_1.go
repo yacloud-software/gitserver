@@ -1,8 +1,15 @@
 // client create: GIT2Client
+/*
+  Created by /home/cnw/devel/go/go-tools/src/golang.conradwood.net/gotools/protoc-gen-cnw/protoc-gen-cnw.go
+*/
+
 /* geninfo:
    filename  : protos/golang.conradwood.net/apis/gitserver/gitserver.proto
    gopackage : golang.conradwood.net/apis/gitserver
    importname: ai_0
+   clientfunc: GetGIT2
+   serverfunc: NewGIT2
+   lookupfunc: GIT2LookupID
    varname   : client_GIT2Client_0
    clientname: GIT2Client
    servername: GIT2Server
@@ -33,8 +40,9 @@ func GetGIT2Client() GIT2Client {
        return client_GIT2Client_0
     }
 
-    client_GIT2Client_0 = NewGIT2Client(client.Connect("gitserver.GIT2"))
+    client_GIT2Client_0 = NewGIT2Client(client.Connect(GIT2LookupID()))
     lock_GIT2Client_0.Unlock()
     return client_GIT2Client_0
 }
 
+func GIT2LookupID() string { return "gitserver.GIT2" } // returns the ID suitable for lookup in the registry. treat as opaque, subject to change.

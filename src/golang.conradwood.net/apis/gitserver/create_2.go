@@ -1,8 +1,15 @@
 // client create: GITCredentialsClient
+/*
+  Created by /home/cnw/devel/go/go-tools/src/golang.conradwood.net/gotools/protoc-gen-cnw/protoc-gen-cnw.go
+*/
+
 /* geninfo:
    filename  : protos/golang.conradwood.net/apis/gitserver/gitserver.proto
    gopackage : golang.conradwood.net/apis/gitserver
    importname: ai_1
+   clientfunc: GetGITCredentials
+   serverfunc: NewGITCredentials
+   lookupfunc: GITCredentialsLookupID
    varname   : client_GITCredentialsClient_1
    clientname: GITCredentialsClient
    servername: GITCredentialsServer
@@ -33,8 +40,9 @@ func GetGITCredentialsClient() GITCredentialsClient {
        return client_GITCredentialsClient_1
     }
 
-    client_GITCredentialsClient_1 = NewGITCredentialsClient(client.Connect("gitserver.GITCredentials"))
+    client_GITCredentialsClient_1 = NewGITCredentialsClient(client.Connect(GITCredentialsLookupID()))
     lock_GITCredentialsClient_1.Unlock()
     return client_GITCredentialsClient_1
 }
 
+func GITCredentialsLookupID() string { return "gitserver.GITCredentials" } // returns the ID suitable for lookup in the registry. treat as opaque, subject to change.
