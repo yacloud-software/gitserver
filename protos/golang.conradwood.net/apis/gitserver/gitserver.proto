@@ -9,6 +9,7 @@ import "golang.conradwood.net/apis/auth/auth.proto";
 /*
  SC_FIRMWARE_XXX means the main singingcat 'kernel' running on cpu XXX
  note that a repo can have multiple tags, for example an SC_APP_XXX can be compiled from the same source in a repo
+ TODO: merge this with golang.singingcat.net/apis/firmwaretracker. Probably involves changing it from 'tag' to 'resulting_in' based system
 */
 enum REPOTAG {
   UNDEFINED=0;
