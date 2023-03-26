@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	SERVICES_ALL = []string{"60757"} // espota
+	SERVICES_ALL = []string{"60757", "833"} // espota
 	// additional (completed) repos the repobuilder service may read. For example, "skel-go"
 	REPOBUILDER_READ     = []uint64{64}
 	disable_access_check = flag.Bool("disable_access_check", false, "if true, allow all access")
