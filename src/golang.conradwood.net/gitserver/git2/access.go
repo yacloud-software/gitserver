@@ -9,7 +9,6 @@ import (
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/utils"
-	"strings"
 )
 
 var (
@@ -20,7 +19,16 @@ var (
 )
 
 func is_privileged_service(ctx context.Context) bool {
-	return auth.IsService(ctx, strings.Join(SERVICES_ALL, ","))
+	svc := auth.GetService(ctx)
+	if svc == nil {
+		return false
+	}
+	for _, sa := range SERVICES_ALL {
+		if svc.ID == sa {
+			return true
+		}
+	}
+	return false
 }
 
 // nil if ok
