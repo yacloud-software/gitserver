@@ -529,7 +529,7 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 }
 func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
 	check_user := true
-	serr := errors.NeedServiceOrRoot(ctx, []string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID})
+	serr := errors.NeedServiceOrRoot(ctx, append([]string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID}, PRIVILEGED_SERVICES...))
 	if serr == nil {
 		check_user = false
 	}

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	SERVICES_ALL = []string{"60757", "833"} // espota
+	PRIVILEGED_SERVICES = []string{"60757", "833"} // espota
 	// additional (completed) repos the repobuilder service may read. For example, "skel-go"
 	REPOBUILDER_READ     = []uint64{64}
 	disable_access_check = flag.Bool("disable_access_check", false, "if true, allow all access")
@@ -23,7 +23,7 @@ func is_privileged_service(ctx context.Context) bool {
 	if svc == nil {
 		return false
 	}
-	for _, sa := range SERVICES_ALL {
+	for _, sa := range PRIVILEGED_SERVICES {
 		if svc.ID == sa {
 			return true
 		}
