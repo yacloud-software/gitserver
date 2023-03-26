@@ -9,16 +9,25 @@ import (
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/utils"
+	"strings"
 )
 
 var (
+	SERVICES_ALL = []string{"833"} // espota
 	// additional (completed) repos the repobuilder service may read. For example, "skel-go"
 	REPOBUILDER_READ     = []uint64{64}
 	disable_access_check = flag.Bool("disable_access_check", false, "if true, allow all access")
 )
 
+func is_privileged_service(ctx context.Context) bool {
+	return auth.IsService(ctx, strings.Join(SERVICES_ALL, ","))
+}
+
 // nil if ok
 func wantRepoAccess(ctx context.Context, repo *gitpb.SourceRepository, writereq bool) error {
+	if is_privileged_service(ctx) {
+		return nil
+	}
 	objauth := objectauth.GetObjectAuthClient()
 	ar, err := objauth.AskObjectAccess(ctx, &objectauth.AuthRequest{
 		ObjectType: objectauth.OBJECTTYPE_GitRepository,
@@ -47,6 +56,9 @@ func wantRepoAccess(ctx context.Context, repo *gitpb.SourceRepository, writereq 
 // allows access to the user "by objectauth"
 // allows access to repos for repobuilder if repo is not complete yet
 func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
+	if is_privileged_service(ctx) {
+		return true
+	}
 	if h.user == nil {
 		return false
 	}
