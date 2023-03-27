@@ -527,30 +527,27 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 	fmt.Printf("Serverprocess-space hook \"%s\" completed for repo #%d \"%s\"\n", req.HookName, hr.repo.gitrepo.ID, hr.repo.AbsDirectory())
 	return nil
 }
-func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
-	check_user := true
-	serr := errors.NeedServiceOrRoot(ctx, append([]string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID}, PRIVILEGED_SERVICES...))
-	if serr == nil {
-		check_user = false
+func (g *GIT2) GetLatestSuccessfulBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
+	err := wants_access_to_build(ctx, req.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	if check_user {
-		ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
-		ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
-		if err != nil {
-			return nil, err
-		}
-		if ol == nil {
-			fmt.Printf("for a weird reason we did not get a permissions object but no error either")
-			return nil, fmt.Errorf("permission error")
-		}
-		if ol.Permissions == nil {
-			return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", req.ID)
-		}
-		if !ol.Permissions.Read {
-			return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no read permission)", req.ID)
-		}
+	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 and success = true order by id desc limit 1", req.ID)
+	if err != nil {
+		return nil, err
 	}
+	if len(builds) == 0 {
+		return nil, errors.NotFound(ctx, "no build for repo %d", req.ID)
+	}
+	return builds[0], nil
+}
+func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
+	err := wants_access_to_build(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 order by id desc limit 1", req.ID)
 	if err != nil {
 		return nil, err

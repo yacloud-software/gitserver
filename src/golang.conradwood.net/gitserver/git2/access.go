@@ -145,3 +145,30 @@ func isrepobuilder(ctx context.Context) bool {
 	}
 	return false
 }
+
+func wants_access_to_build(ctx context.Context, repoid uint64) error {
+	check_user := true
+	serr := errors.NeedServiceOrRoot(ctx, append([]string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID}, PRIVILEGED_SERVICES...))
+	if serr == nil {
+		check_user = false
+	}
+
+	if check_user {
+		ot := &objectauth.AuthRequest{ObjectType: objectauth.OBJECTTYPE_GitRepository, ObjectID: repoid}
+		ol, err := objectauth.GetObjectAuthClient().AskObjectAccess(ctx, ot)
+		if err != nil {
+			return err
+		}
+		if ol == nil {
+			fmt.Printf("for a weird reason we did not get a permissions object but no error either")
+			return fmt.Errorf("permission error")
+		}
+		if ol.Permissions == nil {
+			return errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", repoid)
+		}
+		if !ol.Permissions.Read {
+			return errors.AccessDenied(ctx, "access denied to git repository %d (no read permission)", repoid)
+		}
+	}
+	return nil
+}
