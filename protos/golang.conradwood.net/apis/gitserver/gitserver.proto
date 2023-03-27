@@ -300,8 +300,10 @@ service GIT2 {
   rpc GetReposTags(RepoTagRequest) returns (SourceRepositoryList);
   // get recent builds
   rpc GetRecentBuilds(ByIDRequest) returns (BuildList);
-  // get most recent build
+  // get most recent (possibly failed) build
   rpc GetLatestBuild(ByIDRequest) returns (Build);
+  // get most recent successful build
+  rpc GetLatestSuccessfulBuild(ByIDRequest) returns (Build);
   // make repobuilder no longer read-only
   rpc UpdateRepoStatus(UpdateRepoStatusRequest) returns (SourceRepository);
   // run a hook. this is invoked from git:/hooks/[scriptname]->git-hook binary->gRPC and subject to special restrictions,
