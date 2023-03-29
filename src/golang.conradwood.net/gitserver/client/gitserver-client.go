@@ -97,15 +97,7 @@ func showrepo() {
 	}
 	b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
 	utils.Bail("did not get latest build", err)
-	bs, err := pb.GetGIT2Client().GetLatestSuccessfulBuild(ctx, rid)
-	utils.Bail("did not get latest build", err)
-
-	s := fmt.Sprintf("%d", b.ID)
-	if bs.ID != b.ID {
-		s = fmt.Sprintf("%d (last successful build: %d)", b.ID, bs.ID)
-	}
-	fmt.Printf("Latest Build  : %s\n", s)
-
+	fmt.Printf("Latest Build  : %d\n", b.ID)
 }
 
 func Delete() {
