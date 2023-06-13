@@ -3,6 +3,11 @@ package git2
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
+
 	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	oa "golang.conradwood.net/apis/objectauth"
@@ -15,10 +20,6 @@ import (
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/http"
 	"golang.conradwood.net/go-easyops/utils"
-	"net/url"
-	"sort"
-	"strings"
-	"time"
 )
 
 const (
@@ -59,7 +60,7 @@ func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.S
 	return sr.Repository, nil
 }
 func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
-	if !isrepobuilder(ctx) {
+	if !isrepobuilder(ctx) && !*disable_access_check {
 		//fmt.Printf("Getting repo by id %d\n", req.ID)
 		ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
 		ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
