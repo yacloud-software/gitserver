@@ -22,13 +22,9 @@ import (
 	"golang.conradwood.net/go-easyops/utils"
 )
 
-const (
-	REPO_SERVICE_ID    = "3539"
-	WEB_SERVICE_ID     = "145"
-	GOTOOLS_SERVICE_ID = "42195"
-)
-
 var (
+	WEB_SERVICE_ID     = auth.GetServiceIDByName("scweb.SCWebService")
+	GOTOOLS_SERVICE_ID = auth.GetServiceIDByName("gotools.GoTools")
 	// these repos may be 'reset' back to 'bare' at any time
 	RESETTABLE_REPOS = []uint64{216}
 	urlCache         = cache.NewResolvingCache("giturlcache", time.Duration(15)*time.Minute, 1000)
@@ -308,6 +304,7 @@ func (g *GIT2) RepoBuilderComplete(ctx context.Context, req *gitpb.ByIDRequest) 
 	if u == nil {
 		return nil, errors.AccessDenied(ctx, "repobuilder only")
 	}
+	REPO_SERVICE_ID := auth.GetServiceIDByName("repobuilder.RepoBuilder")
 	if u.ID != REPO_SERVICE_ID {
 		fmt.Printf("UserID: %s\n", u.ID)
 		return nil, errors.AccessDenied(ctx, "repobuilder service only")

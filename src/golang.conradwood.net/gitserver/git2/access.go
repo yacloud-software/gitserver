@@ -12,9 +12,12 @@ import (
 )
 
 var (
-	PRIVILEGED_SERVICES = []string{"60757", "833"} // espota
+	PRIVILEGED_SERVICES = []string{
+		auth.GetServiceIDByName("firmwaretracker.FirmwareTracker"),
+		auth.GetServiceIDByName("espota.ESPOtaService"),
+	}
 	// additional (completed) repos the repobuilder service may read. For example, "skel-go"
-	REPOBUILDER_READ     = []uint64{64}
+	REPOBUILDER_READ     = []uint64{64} // a gitrepoid (e.g. skel-go)
 	disable_access_check = flag.Bool("disable_access_check", false, "if true, allow all access")
 )
 
@@ -136,6 +139,7 @@ func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
 
 func isrepobuilder(ctx context.Context) bool {
 	s := auth.GetService(ctx)
+	REPO_SERVICE_ID := auth.GetServiceIDByName("repobuilder.RepoBuilder")
 	if s != nil && s.ID == REPO_SERVICE_ID {
 		return true
 	}

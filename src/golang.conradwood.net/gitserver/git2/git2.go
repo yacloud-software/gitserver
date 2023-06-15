@@ -229,6 +229,7 @@ func (h *HTTPRequest) ServeHTTP() {
 		return
 	}
 
+	REPO_SERVICE_ID := au.GetServiceIDByName("repobuilder.RepoBuilder")
 	if h.isWrite() && h.user.ID != REPO_SERVICE_ID {
 		if h.repo == nil || h.git2 == nil {
 			fmt.Printf("uninitialized request\n")
