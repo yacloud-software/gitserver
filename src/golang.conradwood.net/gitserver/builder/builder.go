@@ -16,16 +16,6 @@ const (
 
 var (
 	scriptsdir string
-	// files that are required for gitserver to work properly
-	requiredFiles = []string{
-		"clean-build.sh",
-		"go-build.sh",
-		"java-build.sh",
-		"kicad-build.sh",
-		"protos-build.sh",
-		"scuserapp-build.sh",
-		"dist.sh",
-	}
 	// location where to look for files
 	dirs = []string{
 		"/tmp/migrate/",
@@ -36,21 +26,6 @@ var (
 )
 
 func Start() error {
-	for _, r := range requiredFiles {
-		f := ""
-		for _, d := range dirs {
-			f = findfile(d + "/" + r)
-			if f != "" {
-				break
-			}
-		}
-		if f == "" {
-			return fmt.Errorf("Could not find %s", r)
-		}
-		files[r] = f
-		fmt.Printf("File \"%s\" found at: \"%s\"\n", r, files[r])
-		scriptsdir = filepath.Dir(f)
-	}
 	fmt.Printf("Starting git listener on tcp port %d\n", *config.Gitport)
 	go tcpin()
 	return nil
