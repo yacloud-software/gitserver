@@ -495,7 +495,7 @@ func (g *GIT2) GetRecentBuilds(ctx context.Context, req *gitpb.ByIDRequest) (*gi
 func checkValidHost(ctx context.Context, host string) error {
 	_, b, _ := query.SendPing(ctx, host)
 	if !b {
-		return errors.NotFound(ctx, "no gitserver at that host", "no gitserver at host \"%s\"", host)
+		return errors.NotFound(ctx, "no gitserver at host \"%s\"", host)
 	}
 	return nil
 }
