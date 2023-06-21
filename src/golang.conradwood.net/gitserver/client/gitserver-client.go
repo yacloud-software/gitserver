@@ -151,7 +151,14 @@ func Create() {
 }
 
 func Rebuild() error {
+	time.Sleep(time.Duration(2) * time.Second)
 	u, _ := authremote.GetLocalUsers()
+	if u == nil {
+		fmt.Printf("No local user.\n")
+		os.Exit(10)
+	}
+	fmt.Printf("Running rebuild as you\n")
+	auth.PrintSignedUser(u)
 	cb := ctx.NewContextBuilder()
 	cb.WithUser(u)
 	cb.WithTimeout(time.Duration(60) * time.Minute)
