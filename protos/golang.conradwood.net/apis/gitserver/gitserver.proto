@@ -122,6 +122,10 @@ message PostReceiveStream {
 message ByIDRequest {
   uint64 ID = 1;
 }
+message RebuildRequest {
+  uint64 ID = 1;
+  repeated string ExcludeBuildScripts=2; // passed to gitbuilder. typically one excludes "DIST" for rebuilds
+}
 message ByURLRequest {
   string URL = 1;
 }
@@ -318,7 +322,7 @@ service GIT2 {
     Build Repository will - normally - reject this (builds are immutable). This can, however, be useful to 
     verify if configuration changes on the buildserver result in a successful build.
   */
-  rpc Rebuild(ByIDRequest) returns (stream HookResponse);
+  rpc Rebuild(RebuildRequest) returns (stream HookResponse);
 }
 
 /*********************************
