@@ -25,6 +25,7 @@ type ExternalGitTrigger interface {
 	NewRev() string
 	Branch() string
 	UserID() string
+	ExcludeBuildScripts() []string
 }
 
 func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint64, w io.Writer) (*gitbuilder.BuildResponse, error) {
@@ -44,12 +45,13 @@ func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint
 
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
-		GitURL:       url,
-		CommitID:     gt.NewRev(),
-		BuildNumber:  buildid,
-		RepositoryID: gt.RepositoryID(),
-		RepoName:     repo.ArtefactName,
-		ArtefactName: repo.ArtefactName,
+		GitURL:              url,
+		CommitID:            gt.NewRev(),
+		BuildNumber:         buildid,
+		RepositoryID:        gt.RepositoryID(),
+		RepoName:            repo.ArtefactName,
+		ArtefactName:        repo.ArtefactName,
+		ExcludeBuildScripts: gt.ExcludeBuildScripts(),
 	}
 	// might have to add special routing tags to context to route it to a SPECIFIC builder
 	rm := make(map[string]string)

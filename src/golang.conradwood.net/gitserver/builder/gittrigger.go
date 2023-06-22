@@ -52,7 +52,9 @@ func ParseGitTrigger(line string) (*GitTrigger, error) {
 	res.gitinfo = gp
 	return res, nil
 }
-
+func (g *GitTrigger) ExcludeBuildScripts() []string {
+	return nil
+}
 func (g *GitTrigger) Branch() string {
 	return strings.TrimPrefix(g.ref, "refs/heads/")
 }

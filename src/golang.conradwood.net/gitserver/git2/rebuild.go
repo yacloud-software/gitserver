@@ -10,7 +10,7 @@ import (
 	"golang.conradwood.net/go-easyops/errors"
 )
 
-func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) error {
+func (g *GIT2) Rebuild(req *gitpb.RebuildRequest, srv gitpb.GIT2_RebuildServer) error {
 	ctx := srv.Context()
 	user := auth.GetUser(ctx)
 	if user == nil {
@@ -36,11 +36,12 @@ func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) err
 
 	w := &HookResponseWriter{srv: srv}
 	rt := &RebuildTrigger{
-		ctx:    ctx,
-		userid: user.ID,
-		repoid: sr.ID,
-		newrev: build.CommitHash,
-		branch: build.Branch,
+		ctx:             ctx,
+		userid:          user.ID,
+		repoid:          sr.ID,
+		newrev:          build.CommitHash,
+		branch:          build.Branch,
+		excludedscripts: req.ExcludeBuildScripts,
 	}
 	fmt.Printf("Rebuilding Build #%d for user \"%s\"\n", buildid, auth.UserIDString(user))
 	lr, err := builder.RunExternalBuilder(ctx, rt, build.ID, w)
@@ -62,13 +63,17 @@ func (g *GIT2) Rebuild(req *gitpb.ByIDRequest, srv gitpb.GIT2_RebuildServer) err
 }
 
 type RebuildTrigger struct {
-	ctx    context.Context
-	userid string
-	repoid uint64
-	newrev string
-	branch string
+	ctx             context.Context
+	userid          string
+	repoid          uint64
+	newrev          string
+	branch          string
+	excludedscripts []string
 }
 
+func (r *RebuildTrigger) ExcludeBuildScripts() []string {
+	return r.excludedscripts
+}
 func (r *RebuildTrigger) RepositoryID() uint64 {
 	return r.repoid
 }

@@ -11,10 +11,12 @@ import (
 	"golang.conradwood.net/go-easyops/utils"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
 var (
+	exc         = flag.String("exc_scripts", "", "comma delimeted list of scripts to be excluded from run. passed on to gitbuilder. typically 'DIST'")
 	latest      = flag.Bool("latest", false, "get latest build of current repo")
 	desc        = flag.String("desc", "", "description of new repo")
 	delete      = flag.Bool("delete", false, "delete repo")
@@ -163,7 +165,11 @@ func Rebuild() error {
 	cb.WithUser(u)
 	cb.WithTimeout(time.Duration(60) * time.Minute)
 	ctx := cb.ContextWithAutoCancel()
-	rl, err := pb.GetGIT2Client().Rebuild(ctx, &pb.ByIDRequest{ID: *rebuild})
+	br := &pb.RebuildRequest{
+		ID:                  *rebuild,
+		ExcludeBuildScripts: parseCommaDelimetedList(*exc),
+	}
+	rl, err := pb.GetGIT2Client().Rebuild(ctx, br)
 	if err != nil {
 		return err
 	}
@@ -186,4 +192,16 @@ func Rebuild() error {
 		}
 	}
 	return nil
+}
+
+func parseCommaDelimetedList(f string) []string {
+	var res []string
+	if f == "" {
+		return res
+	}
+	for _, s := range strings.Split(f, ",") {
+		s = strings.Trim(s, " ")
+		res = append(res, s)
+	}
+	return res
 }
