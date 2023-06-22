@@ -7,6 +7,7 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/client"
 	"golang.conradwood.net/go-easyops/ctx"
 	"golang.conradwood.net/go-easyops/utils"
 	"io"
@@ -153,7 +154,7 @@ func Create() {
 }
 
 func Rebuild() error {
-	time.Sleep(time.Duration(2) * time.Second)
+	client.GetSignatureFromAuth()
 	u, _ := authremote.GetLocalUsers()
 	if u == nil {
 		fmt.Printf("No local user.\n")
@@ -173,6 +174,8 @@ func Rebuild() error {
 	if err != nil {
 		return err
 	}
+	failed := false
+	var ferr error
 	for {
 		hr, err := rl.Recv()
 		if hr != nil {
@@ -182,15 +185,25 @@ func Rebuild() error {
 			if hr.ErrorMessage != "" {
 				fmt.Println("************** ERROR")
 				fmt.Println(hr.ErrorMessage)
+				failed = true
 			}
 		}
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			failed = true
+			ferr = err
+			break
 		}
 	}
+	if ferr != nil {
+		return ferr
+	}
+	if failed {
+		return fmt.Errorf("failed (errormessage in log)")
+	}
+	fmt.Printf("Build successful\n")
 	return nil
 }
 
