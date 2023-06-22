@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	githost     = flag.String("githost", "git.conradwood.net", "default git host for create")
 	exc         = flag.String("exc_scripts", "", "comma delimeted list of scripts to be excluded from run. passed on to gitbuilder. typically 'DIST'")
 	latest      = flag.Bool("latest", false, "get latest build of current repo")
 	desc        = flag.String("desc", "", "description of new repo")
@@ -146,7 +147,7 @@ func Create() {
 		os.Exit(10)
 	}
 	path := fmt.Sprintf("%s/%s.git", u.Abbrev, *aname)
-	url := &pb.SourceRepositoryURL{Host: "git.conradwood.net", Path: path}
+	url := &pb.SourceRepositoryURL{Host: *githost, Path: path}
 	fr := &pb.CreateRepoRequest{ArtefactName: *aname, URL: url, Description: *desc}
 	rl, err := pb.GetGIT2Client().CreateRepo(ctx, fr)
 	utils.Bail("Failed to create repo", err)
