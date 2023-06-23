@@ -7,7 +7,7 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
-	"golang.conradwood.net/go-easyops/client"
+	//	"golang.conradwood.net/go-easyops/client"
 	"golang.conradwood.net/go-easyops/ctx"
 	"golang.conradwood.net/go-easyops/utils"
 	"io"
@@ -155,7 +155,7 @@ func Create() {
 }
 
 func Rebuild() error {
-	client.GetSignatureFromAuth()
+	//	client.GetSignatureFromAuth()
 	u, _ := authremote.GetLocalUsers()
 	if u == nil {
 		fmt.Printf("No local user.\n")

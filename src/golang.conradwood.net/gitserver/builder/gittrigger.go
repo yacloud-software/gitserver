@@ -6,8 +6,6 @@ import (
 	pb "golang.conradwood.net/apis/gitserver"
 	//	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
-	"golang.conradwood.net/go-easyops/cmdline"
-	"golang.conradwood.net/go-easyops/rpc"
 	"golang.conradwood.net/go-easyops/utils"
 	"strings"
 )
@@ -69,22 +67,8 @@ func (g *GitTrigger) GetContext() (context.Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cmdline.ContextWithBuilder() {
-		return ctx, nil
-	}
-	cs := rpc.CallStateFromContext(ctx)
-	if cs == nil {
-		return nil, fmt.Errorf("No callstate\n")
-	}
-	if cs.Metadata == nil {
-		return nil, fmt.Errorf("No metadata in callstate\n")
-	}
-	cs.Metadata.User = user
-	err = cs.UpdateContextFromResponse()
-	if err != nil {
-		return nil, err
-	}
-	return cs.Context, nil
+	return ctx, nil
+
 }
 func (g *GitTrigger) UserID() string {
 	return g.gitinfo.UserID
