@@ -43,10 +43,7 @@ this binary can be used as git helper. it reads context from environment variabl
 
 
 
----- gitbuilder ---
-the gitbuilder does builds (not gitserver).
-the gitserver includes a binary called "gitcredentials".
-this binary can be used as git helper. it reads context from environment variables, does a little ping-pong between gitserver and itself and passes a git compatible username/password combination to git. Git uses that to clone/push. These credentials are temporary only.
+
 
 
 
