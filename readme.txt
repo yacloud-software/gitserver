@@ -43,7 +43,10 @@ this binary can be used as git helper. it reads context from environment variabl
 
 
 
+------- http "api" -------
 
+${BASEURL}/Rebuild/[BuildID]
+will perform a rebuild (without dist)
 
 
 
