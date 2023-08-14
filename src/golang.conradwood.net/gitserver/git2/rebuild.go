@@ -9,19 +9,32 @@ import (
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
+	"strconv"
 	"strings"
 )
 
 func (h *HTTPRequest) isRebuild() bool {
 	u := h.r.URL.Path
-	if strings.HasSuffix(u, `/Rebuild`) {
+	if strings.Contains(u, `/Rebuild/`) {
 		return true
 	}
 	return false
 }
 func (h *HTTPRequest) RebuildRepo() {
+	rebstr := "/Rebuild/"
+	idx := strings.Index(h.r.URL.Path, rebstr)
+	if idx == -1 {
+		fmt.Printf("Missing \"%s\" in Path (%s)\n", rebstr, h.r.URL.Path)
+		return
+	}
+	ids := h.r.URL.Path[idx+len(rebstr):]
+	id, err := strconv.ParseUint(ids, 10, 64)
+	if err != nil {
+		fmt.Printf("Invalid id: %s\n", err)
+		return
+	}
 	rr := &gitpb.RebuildRequest{
-		ID:                  18835,
+		ID:                  id,
 		ExcludeBuildScripts: []string{"DIST"},
 	}
 	gotuser := h.setUser()
@@ -36,7 +49,12 @@ func (h *HTTPRequest) RebuildRepo() {
 		return
 	}
 
-	rebuild(rr, NewHTTPWriter(h, ctx))
+	err = rebuild(rr, NewHTTPWriter(h, ctx))
+	if err != nil {
+		fmt.Printf("Rebuild encountered error: %s\n", err)
+		h.Write([]byte(fmt.Sprintf("Rebuild encountered error: %s\n", err)))
+	}
+
 }
 func (g *GIT2) Rebuild(req *gitpb.RebuildRequest, srv gitpb.GIT2_RebuildServer) error {
 	return rebuild(req, srv)
