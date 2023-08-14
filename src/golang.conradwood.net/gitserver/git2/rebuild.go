@@ -28,13 +28,13 @@ func (h *HTTPRequest) RebuildRepo() {
 		return
 	}
 	ids := h.r.URL.Path[idx+len(rebstr):]
-	id, err := strconv.ParseUint(ids, 10, 64)
+	buildid, err := strconv.ParseUint(ids, 10, 64)
 	if err != nil {
 		fmt.Printf("Invalid id: %s\n", err)
 		return
 	}
 	rr := &gitpb.RebuildRequest{
-		ID:                  id,
+		ID:                  buildid,
 		ExcludeBuildScripts: []string{"DIST"},
 	}
 	gotuser := h.setUser()
@@ -49,6 +49,29 @@ func (h *HTTPRequest) RebuildRepo() {
 		return
 	}
 
+	h.w.Header().Set("X-gitserver-build", "true")
+
+	build, err := db.DefaultDBBuild().ByID(ctx, buildid)
+	if err != nil {
+		fmt.Printf("Failed to get build: %s\n", err)
+		h.ErrorCode(404, fmt.Sprintf("repo %d not found", buildid))
+		return
+	}
+	sr, err := db.DefaultDBSourceRepository().ByID(ctx, build.RepositoryID)
+	if err != nil {
+		fmt.Printf("Failed to get repo for build: %s\n", err)
+		h.ErrorCode(404, fmt.Sprintf("repo %d not found", buildid))
+		return
+	}
+	err = wantRepoAccess(ctx, sr, false) //readaccess?
+	if err != nil {
+		fmt.Printf("access denied:% s", err)
+		h.ErrorCode(403, "access denied")
+		return
+	}
+	h.w.Header().Set("X-gitserver-repo", fmt.Sprintf("%d", sr.ID))
+	h.w.Header().Set("X-gitserver-artefact", sr.ArtefactName)
+	fmt.Printf("Rebuilding (via url) Build %d in Repository %d (%s)\n", buildid, sr.ID, sr.ArtefactName)
 	err = rebuild(rr, NewHTTPWriter(h, ctx))
 	if err != nil {
 		fmt.Printf("Rebuild encountered error: %s\n", err)
