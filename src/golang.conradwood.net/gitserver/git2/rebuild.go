@@ -7,6 +7,7 @@ import (
 	"golang.conradwood.net/gitserver/builder"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/auth"
+	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
 	"strings"
 )
@@ -19,8 +20,34 @@ func (h *HTTPRequest) isRebuild() bool {
 	return false
 }
 func (h *HTTPRequest) RebuildRepo() {
+	rr := &gitpb.RebuildRequest{
+		ID:                  18835,
+		ExcludeBuildScripts: []string{"DIST"},
+	}
+	gotuser := h.setUser()
+	if !gotuser {
+		h.ErrorCode(401, "authentication required")
+		return
+	}
+
+	ctx, err := authremote.ContextForUser(h.user)
+	if err != nil {
+		h.Error(err)
+		return
+	}
+
+	rebuild(rr, NewHTTPWriter(h, ctx))
 }
 func (g *GIT2) Rebuild(req *gitpb.RebuildRequest, srv gitpb.GIT2_RebuildServer) error {
+	return rebuild(req, srv)
+}
+
+type rebuild_server interface {
+	Context() context.Context
+	Send(hr *gitpb.HookResponse) error
+}
+
+func rebuild(req *gitpb.RebuildRequest, srv rebuild_server) error {
 	ctx := srv.Context()
 	user := auth.GetUser(ctx)
 	if user == nil {
@@ -30,7 +57,7 @@ func (g *GIT2) Rebuild(req *gitpb.RebuildRequest, srv gitpb.GIT2_RebuildServer) 
 	if buildid == 0 {
 		return errors.NotFound(ctx, "cannot rebuild build #0")
 	}
-
+	fmt.Printf("Request to rebuild #%d by user %s\n", req.ID, auth.Description(user))
 	build, err := db.DefaultDBBuild().ByID(ctx, buildid)
 	if err != nil {
 		return err
