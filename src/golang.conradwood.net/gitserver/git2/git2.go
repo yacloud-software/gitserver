@@ -187,6 +187,10 @@ func (h *HTTPRequest) ServeHTTP() {
 		h.RecreateRepo()
 		return
 	}
+	if h.isRebuild() {
+		h.RebuildRepo()
+		return
+	}
 
 	if strings.Contains(h.r.URL.Path, `/self`) {
 		fmt.Printf("Will not allow /self urls (%s)\n", h.r.URL.Path)

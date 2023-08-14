@@ -8,8 +8,18 @@ import (
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/errors"
+	"strings"
 )
 
+func (h *HTTPRequest) isRebuild() bool {
+	u := h.r.URL.Path
+	if strings.HasSuffix(u, `/Rebuild`) {
+		return true
+	}
+	return false
+}
+func (h *HTTPRequest) RebuildRepo() {
+}
 func (g *GIT2) Rebuild(req *gitpb.RebuildRequest, srv gitpb.GIT2_RebuildServer) error {
 	ctx := srv.Context()
 	user := auth.GetUser(ctx)
