@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"net/http"
 )
 
 // send a HTTPResponse server to an http writer
@@ -29,6 +30,9 @@ func (hw *http_writer) Send(hr *gitpb.HookResponse) error {
 	n, err := hw.h.w.Write(b)
 	if len(b) != n {
 		return fmt.Errorf("short write (%d != %d)", n, len(b))
+	}
+	if f, ok := hw.h.w.(http.Flusher); ok {
+		f.Flush()
 	}
 	return err
 }
