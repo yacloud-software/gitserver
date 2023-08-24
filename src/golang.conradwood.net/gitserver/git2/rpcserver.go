@@ -56,7 +56,7 @@ func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.S
 	return sr.Repository, nil
 }
 func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
-	if !isrepobuilder(ctx) && !*disable_access_check {
+	if !isrepobuilder(ctx) && !*disable_access_check && !is_privileged_service(ctx) {
 		//fmt.Printf("Getting repo by id %d\n", req.ID)
 		ot := &oa.AuthRequest{ObjectType: oa.OBJECTTYPE_GitRepository, ObjectID: req.ID}
 		ol, err := oa.GetObjectAuthClient().AskObjectAccess(ctx, ot)
