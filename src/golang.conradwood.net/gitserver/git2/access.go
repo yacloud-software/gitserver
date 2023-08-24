@@ -15,6 +15,7 @@ var (
 	PRIVILEGED_SERVICES = []string{
 		auth.GetServiceIDByName("firmwaretracker.FirmwareTracker"),
 		auth.GetServiceIDByName("espota.ESPOtaService"),
+		auth.GetServiceIDByName("autodeployer.AutoDeployer"),
 	}
 	// additional (completed) repos the repobuilder service may read. For example, "skel-go"
 	REPOBUILDER_READ     = []uint64{64} // a gitrepoid (e.g. skel-go)
