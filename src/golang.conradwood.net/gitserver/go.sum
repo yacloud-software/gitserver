@@ -26,6 +26,8 @@ github.com/prometheus/common v0.44.0/go.mod h1:ofAIvZbQ1e/nugmZGz4/qCb9Ap1VoSTIO
 github.com/prometheus/procfs v0.11.0 h1:5EAgkfkMl659uZPbe9AS2N68a7Cc1TJbPEuGzFuRbyk=
 github.com/prometheus/procfs v0.11.0/go.mod h1:nwNm2aOCAYw8uTR/9bWRREkZFxAUcWzPHWJq+XBB/FM=
 github.com/rogpeppe/go-internal v1.10.0 h1:TMyTOH3F/DB16zRVcYyreMH6GnZZrwQVAoYjRBZyWFQ=
+golang.conradwood.net/apis/artefact v1.1.2489 h1:08CB/yBsZtm4uwS4HhB20oujlHfqNNYVQRmQz+ioNrY=
+golang.conradwood.net/apis/artefact v1.1.2489/go.mod h1:Sn31WXnS+nJqfeekF0vBpXinAwDUX52ARh+PdDopRCY=
 golang.conradwood.net/apis/auth v1.1.2371 h1:gGDtldT/act11Quodp1MDUM/pT5X2riap81ydzRv96o=
 golang.conradwood.net/apis/auth v1.1.2371/go.mod h1:fSUBsbI20NWObVPxUFMHoE64qmmvU6EgU4Bd8wjshmI=
 golang.conradwood.net/apis/autodeployer v1.1.2371 h1:99mbhzclMtBI8q5AHsJ7V6aV2oQd3yr9CEtX/5Cgu20=

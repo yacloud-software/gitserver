@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/gitserver/builder"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/auth"
@@ -111,7 +112,10 @@ func rebuild(req *gitpb.RebuildRequest, srv rebuild_server) error {
 	if err != nil {
 		return err
 	}
-
+	afid, err := artefacts.RepositoryIDToArtefactID(sr.ID)
+	if err != nil {
+		return err
+	}
 	w := &HookResponseWriter{srv: srv}
 	rt := &RebuildTrigger{
 		ctx:             ctx,
@@ -120,6 +124,7 @@ func rebuild(req *gitpb.RebuildRequest, srv rebuild_server) error {
 		newrev:          build.CommitHash,
 		branch:          build.Branch,
 		excludedscripts: req.ExcludeBuildScripts,
+		artefactid:      afid,
 	}
 	fmt.Printf("Rebuilding Build #%d for user \"%s\"\n", buildid, auth.UserIDString(user))
 	lr, err := builder.RunExternalBuilder(ctx, rt, build.ID, w)
@@ -146,6 +151,7 @@ type RebuildTrigger struct {
 	repoid          uint64
 	newrev          string
 	branch          string
+	artefactid      uint64
 	excludedscripts []string
 }
 
@@ -154,6 +160,9 @@ func (r *RebuildTrigger) ExcludeBuildScripts() []string {
 }
 func (r *RebuildTrigger) RepositoryID() uint64 {
 	return r.repoid
+}
+func (r *RebuildTrigger) ArtefactID() uint64 {
+	return r.artefactid
 }
 func (r *RebuildTrigger) GetContext() (context.Context, error) {
 	return r.ctx, nil

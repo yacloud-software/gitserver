@@ -5,6 +5,7 @@ import (
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
 	//	"golang.conradwood.net/go-easyops/auth"
+	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/utils"
 	"strings"
@@ -16,12 +17,13 @@ this is the line that gets submitted via tcp from the git hook
 
 // the first line:
 type GitTrigger struct {
-	repodir string
-	ref     string
-	oldrev  string
-	newrev  string
-	foo     string
-	gitinfo *pb.GitInfo
+	repodir    string
+	ref        string
+	oldrev     string
+	newrev     string
+	artefactid uint64
+	foo        string
+	gitinfo    *pb.GitInfo
 	//	repo    *pb.Repository
 }
 
@@ -48,6 +50,11 @@ func ParseGitTrigger(line string) (*GitTrigger, error) {
 		return nil, fmt.Errorf("Invalid GITINFO: %s", err)
 	}
 	res.gitinfo = gp
+
+	res.artefactid, err = artefacts.RepositoryIDToArtefactID(res.RepositoryID())
+	if err != nil {
+		return nil, err
+	}
 	return res, nil
 }
 func (g *GitTrigger) ExcludeBuildScripts() []string {
@@ -75,6 +82,9 @@ func (g *GitTrigger) UserID() string {
 }
 func (g *GitTrigger) NewRev() string {
 	return g.newrev
+}
+func (g *GitTrigger) ArtefactID() uint64 {
+	return g.artefactid
 }
 func (g *GitTrigger) RepositoryID() uint64 {
 	return g.gitinfo.RepositoryID

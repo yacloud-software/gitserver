@@ -22,6 +22,7 @@ var (
 // implementation normally GitTrigger
 type ExternalGitTrigger interface {
 	RepositoryID() uint64
+	ArtefactID() uint64
 	NewRev() string
 	Branch() string
 	UserID() string
