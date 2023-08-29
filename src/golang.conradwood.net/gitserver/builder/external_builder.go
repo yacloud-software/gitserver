@@ -125,7 +125,7 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 		return err
 	}
 
-	repodb := db.NewDBSourceRepository(psql)
+	repodb := db.DefaultDBSourceRepository()
 	repo, err := repodb.ByID(ctx, gt.RepositoryID())
 	if err != nil {
 		return err
@@ -149,6 +149,7 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 		RepositoryID: gt.RepositoryID(),
 		RepoName:     repo.ArtefactName,
 		ArtefactName: repo.ArtefactName,
+		ArtefactID:   gt.ArtefactID(),
 	}
 	// might have to add special routing tags to context to route it to a SPECIFIC builder
 	rm := make(map[string]string)
