@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"golang.conradwood.net/apis/common"
 	pb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	//	"golang.conradwood.net/go-easyops/client"
@@ -90,8 +91,16 @@ func main() {
 func showrepo() {
 	ctx := authremote.Context()
 	rl := GetRepository(ctx)
+	af, err := artefacts.RepositoryIDToArtefactID(rl.ID)
+	afs := "n/a"
+	if err != nil {
+		fmt.Printf("failed to get artefact id: %s\n", utils.ErrorString(err))
+	} else {
+		afs = fmt.Sprintf("%d", af)
+	}
 	rid := &pb.ByIDRequest{ID: rl.ID}
 	fmt.Printf("RepositoryID  : %d\n", rl.ID)
+	fmt.Printf("ArtefactID    : %s\n", afs)
 	fmt.Printf("Artefact      : %s\n", rl.ArtefactName)
 	fmt.Printf("Last Commit   : %s\n", utils.TimestampString(rl.LastCommit))
 	fmt.Printf("Last Committer: %s\n", rl.LastCommitUser)
