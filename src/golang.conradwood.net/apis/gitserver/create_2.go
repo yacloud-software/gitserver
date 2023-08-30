@@ -1,6 +1,6 @@
 // client create: GITCredentialsClient
 /*
-  Created by /srv/home/cnw/devel/go/go-tools/src/golang.conradwood.net/gotools/protoc-gen-cnw/protoc-gen-cnw.go
+  Created by /home/cnw/devel/go/yatools/src/golang.yacloud.eu/yatools/protoc-gen-cnw/protoc-gen-cnw.go
 */
 
 /* geninfo:
@@ -13,7 +13,7 @@
    varname   : client_GITCredentialsClient_1
    clientname: GITCredentialsClient
    servername: GITCredentialsServer
-   gscvname  : gitserver.GITCredentials
+   gsvcname  : gitserver.GITCredentials
    lockname  : lock_GITCredentialsClient_1
    activename: active_GITCredentialsClient_1
 */
@@ -46,3 +46,7 @@ func GetGITCredentialsClient() GITCredentialsClient {
 }
 
 func GITCredentialsLookupID() string { return "gitserver.GITCredentials" } // returns the ID suitable for lookup in the registry. treat as opaque, subject to change.
+
+func init() {
+   client.RegisterDependency("gitserver.GITCredentials")
+}

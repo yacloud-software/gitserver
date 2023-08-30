@@ -1,6 +1,6 @@
 // client create: GIT2Client
 /*
-  Created by /srv/home/cnw/devel/go/go-tools/src/golang.conradwood.net/gotools/protoc-gen-cnw/protoc-gen-cnw.go
+  Created by /home/cnw/devel/go/yatools/src/golang.yacloud.eu/yatools/protoc-gen-cnw/protoc-gen-cnw.go
 */
 
 /* geninfo:
@@ -13,7 +13,7 @@
    varname   : client_GIT2Client_0
    clientname: GIT2Client
    servername: GIT2Server
-   gscvname  : gitserver.GIT2
+   gsvcname  : gitserver.GIT2
    lockname  : lock_GIT2Client_0
    activename: active_GIT2Client_0
 */
@@ -46,3 +46,7 @@ func GetGIT2Client() GIT2Client {
 }
 
 func GIT2LookupID() string { return "gitserver.GIT2" } // returns the ID suitable for lookup in the registry. treat as opaque, subject to change.
+
+func init() {
+   client.RegisterDependency("gitserver.GIT2")
+}
