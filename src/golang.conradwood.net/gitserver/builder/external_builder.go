@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	create_artefacts_on_the_fly = flag.Bool("artefacts_create", false, "if true, create artefacts on artefactserver on first build")
+	create_artefacts_on_the_fly = flag.Bool("artefacts_create", true, "if true, create artefacts on artefactserver on first build")
 	def_routing                 = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
 )
 
