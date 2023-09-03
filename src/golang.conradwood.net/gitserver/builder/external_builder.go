@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"golang.conradwood.net/apis/gitbuilder"
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
@@ -16,17 +17,29 @@ import (
 )
 
 var (
-	def_routing = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
+	create_artefacts_on_the_fly = flag.Bool("artefacts_create", false, "if true, create artefacts on artefactserver on first build")
+	def_routing                 = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
 )
 
 // implementation normally GitTrigger
 type ExternalGitTrigger interface {
 	RepositoryID() uint64
-	ArtefactID() uint64
+	//ArtefactID() uint64
 	NewRev() string
 	Branch() string
 	UserID() string
 	ExcludeBuildScripts() []string
+}
+
+func getartefactid(ctx context.Context, repo *gitpb.SourceRepository) (uint64, error) {
+	if *create_artefacts_on_the_fly {
+		afc, err := artefacts.CreateIfRequired(ctx, repo)
+		if err != nil {
+			return 0, err
+		}
+		return afc.Meta.ID, nil
+	}
+	return artefacts.RepositoryIDToArtefactID(repo.ID)
 }
 
 func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint64, w io.Writer) (*gitbuilder.BuildResponse, error) {
@@ -42,8 +55,12 @@ func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint
 	if len(urls) == 0 {
 		return nil, fmt.Errorf("Repository %d (%s) has no urls\n", repo.ID, repo.ArtefactName)
 	}
+	repo.URLs = urls
 	url := fmt.Sprintf("https://%s/git/%s", urls[0].Host, urls[0].Path)
-
+	afcid, err := getartefactid(ctx, repo)
+	if err != nil {
+		return nil, err
+	}
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
 		GitURL:              url,
@@ -53,7 +70,8 @@ func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint
 		RepoName:            repo.ArtefactName,
 		ArtefactName:        repo.ArtefactName,
 		ExcludeBuildScripts: gt.ExcludeBuildScripts(),
-		ArtefactID:          gt.ArtefactID(),
+		ArtefactID:          afcid,
+		//ArtefactID:          gt.ArtefactID(),
 	}
 	// might have to add special routing tags to context to route it to a SPECIFIC builder
 	rm := make(map[string]string)
@@ -140,7 +158,12 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 	if len(urls) == 0 {
 		return fmt.Errorf("Repository %d (%s) has no urls\n", repo.ID, repo.ArtefactName)
 	}
+	repo.URLs = urls
 	url := fmt.Sprintf("https://%s/git/%s", urls[0].Host, urls[0].Path)
+	afcid, err := getartefactid(ctx, repo)
+	if err != nil {
+		return err
+	}
 
 	gb := gitbuilder.GetGitBuilderClient()
 	br := &gitbuilder.BuildRequest{
@@ -150,7 +173,8 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 		RepositoryID: gt.RepositoryID(),
 		RepoName:     repo.ArtefactName,
 		ArtefactName: repo.ArtefactName,
-		ArtefactID:   gt.ArtefactID(),
+		ArtefactID:   afcid,
+		//		ArtefactID:   gt.ArtefactID(),
 	}
 	// might have to add special routing tags to context to route it to a SPECIFIC builder
 	rm := make(map[string]string)
