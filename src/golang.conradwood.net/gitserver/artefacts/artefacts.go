@@ -28,7 +28,7 @@ func CreateIfRequired(ctx context.Context, repo *gitpb.SourceRepository) (*af.Cr
 		return nil, fmt.Errorf("Repository %d (%s) has no urls\n", repo.ID, repo.ArtefactName)
 	}
 	u := repo.URLs[0]
-	car.GitURL = fmt.Sprintf("https://%s/%s", u.Host, u.Path)
+	car.GitURL = fmt.Sprintf("https://%s/git/%s", u.Host, u.Path)
 
 	// get our default build domain  (from buildrepo)
 	bi, err := br.GetBuildRepoManagerClient().GetManagerInfo(ctx, &common.Void{})
