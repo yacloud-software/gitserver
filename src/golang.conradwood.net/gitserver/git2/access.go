@@ -37,6 +37,9 @@ func is_privileged_service(ctx context.Context) bool {
 
 // nil if ok
 func wantRepoAccess(ctx context.Context, repo *gitpb.SourceRepository, writereq bool) error {
+	if HasServiceAnyAccess(ctx, objectauth.OBJECTTYPE_GitRepository) {
+		return nil
+	}
 	if is_privileged_service(ctx) {
 		return nil
 	}
@@ -68,6 +71,9 @@ func wantRepoAccess(ctx context.Context, repo *gitpb.SourceRepository, writereq 
 // allows access to the user "by objectauth"
 // allows access to repos for repobuilder if repo is not complete yet
 func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
+	if HasServiceAnyAccess(ctx, objectauth.OBJECTTYPE_GitRepository) {
+		return true
+	}
 	if is_privileged_service(ctx) {
 		return true
 	}
@@ -152,6 +158,9 @@ func isrepobuilder(ctx context.Context) bool {
 }
 
 func wants_access_to_build(ctx context.Context, repoid uint64) error {
+	if HasServiceAnyAccess(ctx, objectauth.OBJECTTYPE_GitRepository) {
+		return nil
+	}
 	check_user := true
 	serr := errors.NeedServiceOrRoot(ctx, append([]string{WEB_SERVICE_ID, GOTOOLS_SERVICE_ID}, PRIVILEGED_SERVICES...))
 	if serr == nil {

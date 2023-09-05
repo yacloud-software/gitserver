@@ -91,7 +91,7 @@ func main() {
 func showrepo() {
 	ctx := authremote.Context()
 	rl := GetRepository(ctx)
-	af, err := artefacts.RepositoryIDToArtefactID(rl.ID)
+	af, err := artefacts.RepositoryIDToArtefactID(rl)
 	afs := "n/a"
 	if err != nil {
 		fmt.Printf("failed to get artefact id: %s\n", utils.ErrorString(err))

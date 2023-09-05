@@ -112,7 +112,7 @@ func rebuild(req *gitpb.RebuildRequest, srv rebuild_server) error {
 	if err != nil {
 		return err
 	}
-	afid, err := artefacts.RepositoryIDToArtefactID(sr.ID)
+	afid, err := artefacts.RepositoryIDToArtefactID(sr)
 	if err != nil {
 		return err
 	}

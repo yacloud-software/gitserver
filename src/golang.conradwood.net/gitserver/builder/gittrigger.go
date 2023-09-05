@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	pb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/gitserver/db"
 	//	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/go-easyops/authremote"
@@ -51,9 +52,14 @@ func ParseGitTrigger(line string) (*GitTrigger, error) {
 	}
 	res.gitinfo = gp
 
-	res.artefactid, err = artefacts.RepositoryIDToArtefactID(res.RepositoryID())
+	repo, err := db.DefaultDBSourceRepository().ByID(context.Background(), res.RepositoryID())
 	if err != nil {
 		return nil, err
+	}
+	res.artefactid, err = artefacts.RepositoryIDToArtefactID(repo)
+	if err != nil {
+		// can't error here, because there is no artefact on first commit
+		fmt.Printf("Unable to resolve repository to artefact: %s\n", utils.ErrorString(err))
 	}
 	return res, nil
 }

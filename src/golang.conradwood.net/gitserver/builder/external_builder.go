@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	create_artefacts_on_the_fly = flag.Bool("artefacts_create", true, "if true, create artefacts on artefactserver on first build")
-	def_routing                 = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
+	def_routing = flag.Bool("use_default_routing_tags", true, "if true use default routing tags if none is specified for a repository")
 )
 
 // implementation normally GitTrigger
@@ -32,14 +31,11 @@ type ExternalGitTrigger interface {
 }
 
 func getartefactid(ctx context.Context, repo *gitpb.SourceRepository) (uint64, error) {
-	if *create_artefacts_on_the_fly {
-		afc, err := artefacts.CreateIfRequired(ctx, repo)
-		if err != nil {
-			return 0, err
-		}
-		return afc.Meta.ID, nil
+	afc, err := artefacts.CreateIfRequired(ctx, repo)
+	if err != nil {
+		return 0, err
 	}
-	return artefacts.RepositoryIDToArtefactID(repo.ID)
+	return afc.Meta.ID, nil
 }
 
 func RunExternalBuilder(ctx context.Context, gt ExternalGitTrigger, buildid uint64, w io.Writer) (*gitbuilder.BuildResponse, error) {
