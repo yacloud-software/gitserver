@@ -44,6 +44,6 @@ func get_service_access_rights(ctx context.Context, ot oa.OBJECTTYPE) *oa.AllAcc
 		fmt.Printf("failed to get service access right: %s\n", utils.ErrorString(err))
 		return nil
 	}
-	fmt.Printf("ServiceAccess: %#v\n", res)
+	//fmt.Printf("ServiceAccess: %#v\n", res)
 	return res
 }
