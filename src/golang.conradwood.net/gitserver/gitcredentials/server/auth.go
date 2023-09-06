@@ -11,6 +11,7 @@ import (
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
 	"strings"
+	"time"
 )
 
 var (
@@ -47,10 +48,26 @@ func GetAuth(ctx context.Context, stdin string) (string, error) {
 	}
 
 	fmt.Printf("User %s requests auth for host \"%s\"\n", u.ID, hostname)
-	_, ourhost, err := query.SendPing(ctx, hostname)
+	remotes, err := db.DefaultDBInternalGitHost().ByHost(ctx, hostname)
 	if err != nil {
-		fmt.Printf("Ping failed (%s)\n", err)
-		ourhost = false
+		return "", err
+	}
+	ourhost := false
+	if len(remotes) > 0 {
+		exp := uint32(time.Now().Unix())
+		for _, r := range remotes {
+			if r.Expiry <= exp {
+				continue
+			}
+			ourhost = true
+		}
+	}
+	if !ourhost {
+		_, ourhost, err = query.SendPing(ctx, hostname)
+		if err != nil {
+			fmt.Printf("Ping failed (%s)\n", err)
+			ourhost = false
+		}
 	}
 	if !ourhost {
 		// do not send tokens to hosts other than us

@@ -49,4 +49,5 @@ func GITCredentialsLookupID() string { return "gitserver.GITCredentials" } // re
 
 func init() {
    client.RegisterDependency("gitserver.GITCredentials")
+   AddService("gitserver.GITCredentials")
 }

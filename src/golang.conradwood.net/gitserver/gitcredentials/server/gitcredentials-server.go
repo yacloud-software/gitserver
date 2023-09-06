@@ -4,11 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/server"
-	"golang.conradwood.net/go-easyops/sql"
 	"golang.conradwood.net/go-easyops/utils"
 	"google.golang.org/grpc"
 )
@@ -20,9 +20,11 @@ var (
 
 func main() {
 	flag.Parse()
-	psql, err := sql.Open()
-	gitcreddb = db.NewDBGitCredentials(psql)
-	utils.Bail("failed to create tables", gitcreddb.CreateTable(context.Background()))
+	go cleaner_loop()
+	var err error
+	//	psql, err := sql.Open()
+	gitcreddb = db.DefaultDBGitCredentials()
+	//	utils.Bail("failed to create tables", gitcreddb.CreateTable(context.Background()))
 	cserver := &CServer{}
 	sd := server.NewServerDef()
 	sd.Port = *grpc_port
@@ -38,6 +40,24 @@ func main() {
 type CServer struct {
 }
 
+func (c *CServer) CreateGitCredentials(ctx context.Context, req *gitpb.CreateGitCredentialsRequest) (*common.Void, error) {
+	if req.TreatHostAsInternal {
+		igh := &gitpb.InternalGitHost{
+			Host:   req.Credentials.Host,
+			Expiry: req.Credentials.Expiry,
+		}
+		_, err := db.DefaultDBInternalGitHost().Save(ctx, igh)
+		if err != nil {
+			return nil, err
+		}
+		return &common.Void{}, nil
+	}
+	_, err := gitcreddb.Save(ctx, req.Credentials)
+	if err != nil {
+		return nil, err
+	}
+	return &common.Void{}, nil
+}
 func (c *CServer) GitInvoked(ctx context.Context, req *gitpb.GitCredentialsRequest) (*gitpb.GitCredentialsResponse, error) {
 	fmt.Printf("--------------------------------------\n")
 	u := auth.GetUser(ctx)

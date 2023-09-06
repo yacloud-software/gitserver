@@ -16,19 +16,20 @@ package db
 
 Main Table:
 
- CREATE TABLE gitcredentials (id integer primary key default nextval('gitcredentials_seq'),userid text not null  ,host text not null  ,path text not null  ,username text not null  ,password text not null  );
+ CREATE TABLE gitcredentials (id integer primary key default nextval('gitcredentials_seq'),userid text not null  ,host text not null  ,path text not null  ,username text not null  ,password text not null  ,expiry integer not null  );
 
 Alter statements:
-ALTER TABLE gitcredentials ADD COLUMN userid text not null default '';
-ALTER TABLE gitcredentials ADD COLUMN host text not null default '';
-ALTER TABLE gitcredentials ADD COLUMN path text not null default '';
-ALTER TABLE gitcredentials ADD COLUMN username text not null default '';
-ALTER TABLE gitcredentials ADD COLUMN password text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS userid text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS host text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS path text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS username text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS password text not null default '';
+ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS expiry integer not null default 0;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
 
- CREATE TABLE gitcredentials_archive (id integer unique not null,userid text not null,host text not null,path text not null,username text not null,password text not null);
+ CREATE TABLE gitcredentials_archive (id integer unique not null,userid text not null,host text not null,path text not null,username text not null,password text not null,expiry integer not null);
 */
 
 import (
@@ -86,7 +87,7 @@ func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBGitCredentials", "insert into "+a.SQLArchivetablename+" (id,userid, host, path, username, password) values ($1,$2, $3, $4, $5, $6) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password)
+	_, e := a.DB.ExecContext(ctx, "archive_DBGitCredentials", "insert into "+a.SQLArchivetablename+" (id,userid, host, path, username, password, expiry) values ($1,$2, $3, $4, $5, $6, $7) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry)
 	if e != nil {
 		return e
 	}
@@ -99,7 +100,7 @@ func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBGitCredentials) Save(ctx context.Context, p *savepb.GitCredentials) (uint64, error) {
 	qn := "DBGitCredentials_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, host, path, username, password) values ($1, $2, $3, $4, $5) returning id", p.UserID, p.Host, p.Path, p.Username, p.Password)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, host, path, username, password, expiry) values ($1, $2, $3, $4, $5, $6) returning id", p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry)
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -119,13 +120,13 @@ func (a *DBGitCredentials) Save(ctx context.Context, p *savepb.GitCredentials) (
 // Save using the ID specified
 func (a *DBGitCredentials) SaveWithID(ctx context.Context, p *savepb.GitCredentials) error {
 	qn := "insert_DBGitCredentials"
-	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,userid, host, path, username, password) values ($1,$2, $3, $4, $5, $6) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password)
+	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,userid, host, path, username, password, expiry) values ($1,$2, $3, $4, $5, $6, $7) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry)
 	return a.Error(ctx, qn, e)
 }
 
 func (a *DBGitCredentials) Update(ctx context.Context, p *savepb.GitCredentials) error {
 	qn := "DBGitCredentials_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, host=$2, path=$3, username=$4, password=$5 where id = $6", p.UserID, p.Host, p.Path, p.Username, p.Password, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, host=$2, path=$3, username=$4, password=$5, expiry=$6 where id = $7", p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry, p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -140,7 +141,7 @@ func (a *DBGitCredentials) DeleteByID(ctx context.Context, p uint64) error {
 // get it by primary id
 func (a *DBGitCredentials) ByID(ctx context.Context, p uint64) (*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where id = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where id = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error querying (%s)", e))
 	}
@@ -161,7 +162,7 @@ func (a *DBGitCredentials) ByID(ctx context.Context, p uint64) (*savepb.GitCrede
 // get it by primary id (nil if no such ID row, but no error either)
 func (a *DBGitCredentials) TryByID(ctx context.Context, p uint64) (*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_TryByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where id = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where id = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error querying (%s)", e))
 	}
@@ -182,7 +183,7 @@ func (a *DBGitCredentials) TryByID(ctx context.Context, p uint64) (*savepb.GitCr
 // get all rows
 func (a *DBGitCredentials) All(ctx context.Context) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_all"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" order by id")
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" order by id")
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("All: error querying (%s)", e))
 	}
@@ -201,7 +202,7 @@ func (a *DBGitCredentials) All(ctx context.Context) ([]*savepb.GitCredentials, e
 // get all "DBGitCredentials" rows with matching UserID
 func (a *DBGitCredentials) ByUserID(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where userid = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where userid = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
 	}
@@ -216,7 +217,7 @@ func (a *DBGitCredentials) ByUserID(ctx context.Context, p string) ([]*savepb.Gi
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeUserID(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where userid ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where userid ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
 	}
@@ -231,7 +232,7 @@ func (a *DBGitCredentials) ByLikeUserID(ctx context.Context, p string) ([]*savep
 // get all "DBGitCredentials" rows with matching Host
 func (a *DBGitCredentials) ByHost(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByHost"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where host = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where host = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error querying (%s)", e))
 	}
@@ -246,7 +247,7 @@ func (a *DBGitCredentials) ByHost(ctx context.Context, p string) ([]*savepb.GitC
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeHost(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeHost"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where host ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where host ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error querying (%s)", e))
 	}
@@ -261,7 +262,7 @@ func (a *DBGitCredentials) ByLikeHost(ctx context.Context, p string) ([]*savepb.
 // get all "DBGitCredentials" rows with matching Path
 func (a *DBGitCredentials) ByPath(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByPath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where path = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where path = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error querying (%s)", e))
 	}
@@ -276,7 +277,7 @@ func (a *DBGitCredentials) ByPath(ctx context.Context, p string) ([]*savepb.GitC
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikePath(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikePath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where path ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where path ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error querying (%s)", e))
 	}
@@ -291,7 +292,7 @@ func (a *DBGitCredentials) ByLikePath(ctx context.Context, p string) ([]*savepb.
 // get all "DBGitCredentials" rows with matching Username
 func (a *DBGitCredentials) ByUsername(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByUsername"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where username = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where username = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error querying (%s)", e))
 	}
@@ -306,7 +307,7 @@ func (a *DBGitCredentials) ByUsername(ctx context.Context, p string) ([]*savepb.
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeUsername(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeUsername"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where username ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where username ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error querying (%s)", e))
 	}
@@ -321,7 +322,7 @@ func (a *DBGitCredentials) ByLikeUsername(ctx context.Context, p string) ([]*sav
 // get all "DBGitCredentials" rows with matching Password
 func (a *DBGitCredentials) ByPassword(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByPassword"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where password = $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where password = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error querying (%s)", e))
 	}
@@ -336,7 +337,7 @@ func (a *DBGitCredentials) ByPassword(ctx context.Context, p string) ([]*savepb.
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikePassword(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikePassword"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password from "+a.SQLTablename+" where password ilike $1", p)
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where password ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error querying (%s)", e))
 	}
@@ -344,6 +345,36 @@ func (a *DBGitCredentials) ByLikePassword(ctx context.Context, p string) ([]*sav
 	l, e := a.FromRows(ctx, rows)
 	if e != nil {
 		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error scanning (%s)", e))
+	}
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with matching Expiry
+func (a *DBGitCredentials) ByExpiry(ctx context.Context, p uint32) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByExpiry"
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where expiry = $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error querying (%s)", e))
+	}
+	defer rows.Close()
+	l, e := a.FromRows(ctx, rows)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error scanning (%s)", e))
+	}
+	return l, nil
+}
+
+// the 'like' lookup
+func (a *DBGitCredentials) ByLikeExpiry(ctx context.Context, p uint32) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByLikeExpiry"
+	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where expiry ilike $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error querying (%s)", e))
+	}
+	defer rows.Close()
+	l, e := a.FromRows(ctx, rows)
+	if e != nil {
+		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -369,17 +400,17 @@ func (a *DBGitCredentials) Tablename() string {
 }
 
 func (a *DBGitCredentials) SelectCols() string {
-	return "id,userid, host, path, username, password"
+	return "id,userid, host, path, username, password, expiry"
 }
 func (a *DBGitCredentials) SelectColsQualified() string {
-	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".host, " + a.SQLTablename + ".path, " + a.SQLTablename + ".username, " + a.SQLTablename + ".password"
+	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".host, " + a.SQLTablename + ".path, " + a.SQLTablename + ".username, " + a.SQLTablename + ".password, " + a.SQLTablename + ".expiry"
 }
 
 func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
 	var res []*savepb.GitCredentials
 	for rows.Next() {
 		foo := savepb.GitCredentials{}
-		err := rows.Scan(&foo.ID, &foo.UserID, &foo.Host, &foo.Path, &foo.Username, &foo.Password)
+		err := rows.Scan(&foo.ID, &foo.UserID, &foo.Host, &foo.Path, &foo.Username, &foo.Password, &foo.Expiry)
 		if err != nil {
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
@@ -394,14 +425,38 @@ func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*s
 func (a *DBGitCredentials) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null  ,host text not null  ,path text not null  ,username text not null  ,password text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null  ,host text not null  ,path text not null  ,username text not null  ,password text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,host text not null ,path text not null ,username text not null ,password text not null ,expiry integer not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,host text not null ,path text not null ,username text not null ,password text not null ,expiry integer not null );`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS path text not null default '';`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS username text not null default '';`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS password text not null default '';`,
+		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
+
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS path text not null default '';`,
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS username text not null default '';`,
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS password text not null default '';`,
+		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

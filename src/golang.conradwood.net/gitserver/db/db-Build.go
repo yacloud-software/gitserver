@@ -19,13 +19,13 @@ Main Table:
  CREATE TABLE build (id integer primary key default nextval('build_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );
 
 Alter statements:
-ALTER TABLE build ADD COLUMN repositoryid bigint not null default 0;
-ALTER TABLE build ADD COLUMN commithash text not null default '';
-ALTER TABLE build ADD COLUMN branch text not null default '';
-ALTER TABLE build ADD COLUMN logmessage text not null default '';
-ALTER TABLE build ADD COLUMN userid text not null default '';
-ALTER TABLE build ADD COLUMN r_timestamp integer not null default 0;
-ALTER TABLE build ADD COLUMN success boolean not null default false;
+ALTER TABLE build ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;
+ALTER TABLE build ADD COLUMN IF NOT EXISTS commithash text not null default '';
+ALTER TABLE build ADD COLUMN IF NOT EXISTS branch text not null default '';
+ALTER TABLE build ADD COLUMN IF NOT EXISTS logmessage text not null default '';
+ALTER TABLE build ADD COLUMN IF NOT EXISTS userid text not null default '';
+ALTER TABLE build ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;
+ALTER TABLE build ADD COLUMN IF NOT EXISTS success boolean not null default false;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -456,14 +456,40 @@ func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Bui
 func (a *DBBuild) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,commithash text not null  ,branch text not null  ,logmessage text not null  ,userid text not null  ,r_timestamp integer not null  ,success boolean not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,commithash text not null ,branch text not null ,logmessage text not null ,userid text not null ,r_timestamp integer not null ,success boolean not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,commithash text not null ,branch text not null ,logmessage text not null ,userid text not null ,r_timestamp integer not null ,success boolean not null );`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS commithash text not null default '';`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS branch text not null default '';`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS logmessage text not null default '';`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;`,
+		`ALTER TABLE build ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS commithash text not null default '';`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS branch text not null default '';`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS logmessage text not null default '';`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;`,
+		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

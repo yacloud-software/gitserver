@@ -19,15 +19,15 @@ Main Table:
  CREATE TABLE createrepolog (id integer primary key default nextval('createrepolog_seq'),repositoryid bigint not null  ,userid text not null  ,context text not null  ,action integer not null  ,success boolean not null  ,errormessage text not null  ,started integer not null  ,finished integer not null  ,associationtoken text not null  );
 
 Alter statements:
-ALTER TABLE createrepolog ADD COLUMN repositoryid bigint not null default 0;
-ALTER TABLE createrepolog ADD COLUMN userid text not null default '';
-ALTER TABLE createrepolog ADD COLUMN context text not null default '';
-ALTER TABLE createrepolog ADD COLUMN action integer not null default 0;
-ALTER TABLE createrepolog ADD COLUMN success boolean not null default false;
-ALTER TABLE createrepolog ADD COLUMN errormessage text not null default '';
-ALTER TABLE createrepolog ADD COLUMN started integer not null default 0;
-ALTER TABLE createrepolog ADD COLUMN finished integer not null default 0;
-ALTER TABLE createrepolog ADD COLUMN associationtoken text not null default '';
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS userid text not null default '';
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS context text not null default '';
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS action integer not null default 0;
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS success boolean not null default false;
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS errormessage text not null default '';
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS started integer not null default 0;
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS finished integer not null default 0;
+ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS associationtoken text not null default '';
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -518,14 +518,44 @@ func (a *DBCreateRepoLog) FromRows(ctx context.Context, rows *gosql.Rows) ([]*sa
 func (a *DBCreateRepoLog) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,userid text not null  ,context text not null  ,action integer not null  ,success boolean not null  ,errormessage text not null  ,started integer not null  ,finished integer not null  ,associationtoken text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null  ,userid text not null  ,context text not null  ,action integer not null  ,success boolean not null  ,errormessage text not null  ,started integer not null  ,finished integer not null  ,associationtoken text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,userid text not null ,context text not null ,action integer not null ,success boolean not null ,errormessage text not null ,started integer not null ,finished integer not null ,associationtoken text not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,userid text not null ,context text not null ,action integer not null ,success boolean not null ,errormessage text not null ,started integer not null ,finished integer not null ,associationtoken text not null );`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS context text not null default '';`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS action integer not null default 0;`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS errormessage text not null default '';`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS started integer not null default 0;`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS finished integer not null default 0;`,
+		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS context text not null default '';`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS action integer not null default 0;`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS errormessage text not null default '';`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS started integer not null default 0;`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS finished integer not null default 0;`,
+		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

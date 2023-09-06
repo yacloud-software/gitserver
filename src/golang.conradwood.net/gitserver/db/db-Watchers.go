@@ -19,9 +19,9 @@ Main Table:
  CREATE TABLE watchers (id integer primary key default nextval('watchers_seq'),userid text not null  ,repositoryid bigint not null  ,notifytype integer not null  );
 
 Alter statements:
-ALTER TABLE watchers ADD COLUMN userid text not null default '';
-ALTER TABLE watchers ADD COLUMN repositoryid bigint not null default 0;
-ALTER TABLE watchers ADD COLUMN notifytype integer not null default 0;
+ALTER TABLE watchers ADD COLUMN IF NOT EXISTS userid text not null default '';
+ALTER TABLE watchers ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;
+ALTER TABLE watchers ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -332,14 +332,32 @@ func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.
 func (a *DBWatchers) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null  ,repositoryid bigint not null  ,notifytype integer not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null  ,repositoryid bigint not null  ,notifytype integer not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
+		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
+
+		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

@@ -19,25 +19,25 @@ Main Table:
  CREATE TABLE sourcerepository (id integer primary key default nextval('sourcerepository_seq'),filepath text not null  ,artefactname text not null  ,runpostreceive boolean not null  ,runprereceive boolean not null  ,createdcomplete boolean not null  ,description text not null  ,usercommits bigint not null  ,deleted boolean not null  ,deletedtimestamp integer not null  ,deleteuser text not null  ,lastcommit integer not null  ,lastcommituser text not null  ,tags integer not null  ,forking boolean not null  ,forkedfrom bigint not null  ,buildroutingtagname text not null  ,buildroutingtagvalue text not null  ,readonly boolean not null  ,createuser text not null  );
 
 Alter statements:
-ALTER TABLE sourcerepository ADD COLUMN filepath text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN artefactname text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN runpostreceive boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN runprereceive boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN createdcomplete boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN description text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN usercommits bigint not null default 0;
-ALTER TABLE sourcerepository ADD COLUMN deleted boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN deletedtimestamp integer not null default 0;
-ALTER TABLE sourcerepository ADD COLUMN deleteuser text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN lastcommit integer not null default 0;
-ALTER TABLE sourcerepository ADD COLUMN lastcommituser text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN tags integer not null default 0;
-ALTER TABLE sourcerepository ADD COLUMN forking boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN forkedfrom bigint not null default 0;
-ALTER TABLE sourcerepository ADD COLUMN buildroutingtagname text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN buildroutingtagvalue text not null default '';
-ALTER TABLE sourcerepository ADD COLUMN readonly boolean not null default false;
-ALTER TABLE sourcerepository ADD COLUMN createuser text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS filepath text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS artefactname text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS description text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleted boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleteuser text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS tags integer not null default 0;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forking boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS readonly boolean not null default false;
+ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createuser text not null default '';
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -828,14 +828,64 @@ func (a *DBSourceRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]
 func (a *DBSourceRepository) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null  ,artefactname text not null  ,runpostreceive boolean not null  ,runprereceive boolean not null  ,createdcomplete boolean not null  ,description text not null  ,usercommits bigint not null  ,deleted boolean not null  ,deletedtimestamp integer not null  ,deleteuser text not null  ,lastcommit integer not null  ,lastcommituser text not null  ,tags integer not null  ,forking boolean not null  ,forkedfrom bigint not null  ,buildroutingtagname text not null  ,buildroutingtagvalue text not null  ,readonly boolean not null  ,createuser text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null  ,artefactname text not null  ,runpostreceive boolean not null  ,runprereceive boolean not null  ,createdcomplete boolean not null  ,description text not null  ,usercommits bigint not null  ,deleted boolean not null  ,deletedtimestamp integer not null  ,deleteuser text not null  ,lastcommit integer not null  ,lastcommituser text not null  ,tags integer not null  ,forking boolean not null  ,forkedfrom bigint not null  ,buildroutingtagname text not null  ,buildroutingtagvalue text not null  ,readonly boolean not null  ,createuser text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null ,artefactname text not null ,runpostreceive boolean not null ,runprereceive boolean not null ,createdcomplete boolean not null ,description text not null ,usercommits bigint not null ,deleted boolean not null ,deletedtimestamp integer not null ,deleteuser text not null ,lastcommit integer not null ,lastcommituser text not null ,tags integer not null ,forking boolean not null ,forkedfrom bigint not null ,buildroutingtagname text not null ,buildroutingtagvalue text not null ,readonly boolean not null ,createuser text not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null ,artefactname text not null ,runpostreceive boolean not null ,runprereceive boolean not null ,createdcomplete boolean not null ,description text not null ,usercommits bigint not null ,deleted boolean not null ,deletedtimestamp integer not null ,deleteuser text not null ,lastcommit integer not null ,lastcommituser text not null ,tags integer not null ,forking boolean not null ,forkedfrom bigint not null ,buildroutingtagname text not null ,buildroutingtagvalue text not null ,readonly boolean not null ,createuser text not null );`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS filepath text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS description text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleted boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleteuser text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS tags integer not null default 0;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forking boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS readonly boolean not null default false;`,
+		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createuser text not null default '';`,
+
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS filepath text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS description text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deleted boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deleteuser text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS tags integer not null default 0;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS forking boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS readonly boolean not null default false;`,
+		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS createuser text not null default '';`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

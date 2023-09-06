@@ -49,4 +49,5 @@ func GIT2LookupID() string { return "gitserver.GIT2" } // returns the ID suitabl
 
 func init() {
    client.RegisterDependency("gitserver.GIT2")
+   AddService("gitserver.GIT2")
 }

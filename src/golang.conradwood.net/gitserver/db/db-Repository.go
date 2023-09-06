@@ -19,9 +19,9 @@ Main Table:
  CREATE TABLE repository (id integer primary key default nextval('repository_seq'),reponame text not null  ,ownerid text not null  ,artefactname text not null  );
 
 Alter statements:
-ALTER TABLE repository ADD COLUMN reponame text not null default '';
-ALTER TABLE repository ADD COLUMN ownerid text not null default '';
-ALTER TABLE repository ADD COLUMN artefactname text not null default '';
+ALTER TABLE repository ADD COLUMN IF NOT EXISTS reponame text not null default '';
+ALTER TABLE repository ADD COLUMN IF NOT EXISTS ownerid text not null default '';
+ALTER TABLE repository ADD COLUMN IF NOT EXISTS artefactname text not null default '';
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -332,14 +332,32 @@ func (a *DBRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savep
 func (a *DBRepository) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null  ,ownerid text not null  ,artefactname text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null  ,ownerid text not null  ,artefactname text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null ,ownerid text not null ,artefactname text not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null ,ownerid text not null ,artefactname text not null );`,
+		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS reponame text not null default '';`,
+		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS ownerid text not null default '';`,
+		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+
+		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS reponame text not null default '';`,
+		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS ownerid text not null default '';`,
+		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

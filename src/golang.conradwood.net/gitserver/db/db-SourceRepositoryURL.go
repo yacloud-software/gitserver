@@ -19,9 +19,9 @@ Main Table:
  CREATE TABLE sourcerepositoryurl (id integer primary key default nextval('sourcerepositoryurl_seq'),v2repositoryid bigint not null  ,host text not null  ,path text not null  );
 
 Alter statements:
-ALTER TABLE sourcerepositoryurl ADD COLUMN v2repositoryid bigint not null default 0;
-ALTER TABLE sourcerepositoryurl ADD COLUMN host text not null default '';
-ALTER TABLE sourcerepositoryurl ADD COLUMN path text not null default '';
+ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;
+ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS host text not null default '';
+ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS path text not null default '';
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -332,14 +332,32 @@ func (a *DBSourceRepositoryURL) FromRows(ctx context.Context, rows *gosql.Rows) 
 func (a *DBSourceRepositoryURL) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null  ,host text not null  ,path text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null  ,host text not null  ,path text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null ,host text not null ,path text not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null ,host text not null ,path text not null );`,
+		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;`,
+		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS path text not null default '';`,
+
+		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;`,
+		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS path text not null default '';`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

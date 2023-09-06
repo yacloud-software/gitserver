@@ -19,9 +19,9 @@ Main Table:
  CREATE TABLE pingstate (id integer primary key default nextval('pingstate_seq'),associationtoken text not null  ,created integer not null  ,responsetoken text not null  );
 
 Alter statements:
-ALTER TABLE pingstate ADD COLUMN associationtoken text not null default '';
-ALTER TABLE pingstate ADD COLUMN created integer not null default 0;
-ALTER TABLE pingstate ADD COLUMN responsetoken text not null default '';
+ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS associationtoken text not null default '';
+ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS created integer not null default 0;
+ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS responsetoken text not null default '';
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -332,14 +332,32 @@ func (a *DBPingState) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb
 func (a *DBPingState) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null  ,created integer not null  ,responsetoken text not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null  ,created integer not null  ,responsetoken text not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null ,created integer not null ,responsetoken text not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null ,created integer not null ,responsetoken text not null );`,
+		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS created integer not null default 0;`,
+		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS responsetoken text not null default '';`,
+
+		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS created integer not null default 0;`,
+		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS responsetoken text not null default '';`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }

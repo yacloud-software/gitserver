@@ -19,10 +19,10 @@ Main Table:
  CREATE TABLE grouprepositoryaccess (id integer primary key default nextval('grouprepositoryaccess_seq'),repoid bigint not null  ,groupid text not null  ,read boolean not null  ,write boolean not null  );
 
 Alter statements:
-ALTER TABLE grouprepositoryaccess ADD COLUMN repoid bigint not null default 0;
-ALTER TABLE grouprepositoryaccess ADD COLUMN groupid text not null default '';
-ALTER TABLE grouprepositoryaccess ADD COLUMN read boolean not null default false;
-ALTER TABLE grouprepositoryaccess ADD COLUMN write boolean not null default false;
+ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;
+ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS groupid text not null default '';
+ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS read boolean not null default false;
+ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS write boolean not null default false;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
@@ -363,14 +363,34 @@ func (a *DBGroupRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows
 func (a *DBGroupRepositoryAccess) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null  ,groupid text not null  ,read boolean not null  ,write boolean not null  );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null  ,groupid text not null  ,read boolean not null  ,write boolean not null  );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,groupid text not null ,read boolean not null ,write boolean not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,groupid text not null ,read boolean not null ,write boolean not null );`,
+		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
+		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS groupid text not null default '';`,
+		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
+		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
+
+		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
+		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS groupid text not null default '';`,
+		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
+		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
 	}
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
 			return e
 		}
+	}
+
+	// these are optional, expected to fail
+	csql = []string{
+		// Indices:
+
+		// Foreign keys:
+
+	}
+	for i, c := range csql {
+		a.DB.ExecContextQuiet(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 	}
 	return nil
 }
