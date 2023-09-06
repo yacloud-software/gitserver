@@ -96,12 +96,13 @@ func SendPing(ctx context.Context, host string) (*gitpb.PingState, bool, error) 
 		if hb.HTTPCode() == 404 {
 			return nil, false, nil
 		}
-		fmt.Printf("Ping code: %d\n", hb.HTTPCode())
+		fmt.Printf("Ping code from url %s: %d\n", url, hb.HTTPCode())
 		return nil, false, err
 	}
 	psr := &gitpb.PingState{}
 	err = utils.UnmarshalBytes(hb.Body(), psr)
 	if err != nil {
+		fmt.Printf("weird proto received from url %s\n", url)
 		return nil, false, err
 	}
 
