@@ -30,8 +30,17 @@ message GitCredentials {
   string Path=4; // currently ignored
   string Username=5;
   string Password=6;
+  uint32 Expiry=7; // if not 0, this will expire 
 }
-
+message InternalGitHost {
+  uint64 ID=1;
+  string Host=2;
+  uint32 Expiry=3;
+}
+message CreateGitCredentialsRequest {
+  GitCredentials Credentials=1;
+  bool TreatHostAsInternal=2; // if true a token will be generated on-the-fly for access to it
+}
 message RepoTagRequest {
   uint32 Tag=1; // very simple atm. Provide a single tag and it will return only repos with that Tag
 }
@@ -338,11 +347,13 @@ message GitCredentialsRequest {
 message GitCredentialsResponse {
   string Stdout=1;
 }
+
 /*
  * for testing git credentials stuff
 */
 service GITCredentials {
   // called by client if git calls it
   rpc GitInvoked(GitCredentialsRequest) returns (GitCredentialsResponse);
-
+  // create git credentials
+  rpc CreateGitCredentials(CreateGitCredentialsRequest) returns (common.Void);
 }
