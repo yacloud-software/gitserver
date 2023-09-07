@@ -11,7 +11,7 @@ import (
 	"golang.conradwood.net/gitserver/query"
 	au "golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
-	"golang.conradwood.net/go-easyops/cmdline"
+	//	"golang.conradwood.net/go-easyops/cmdline"
 	"golang.conradwood.net/go-easyops/server"
 	"golang.conradwood.net/go-easyops/sql"
 	"golang.conradwood.net/go-easyops/utils"
@@ -21,7 +21,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
+	//	"path/filepath"
 	"strings"
 	"time"
 )
@@ -57,18 +57,21 @@ func Start() error {
 	if err != nil {
 		return err
 	}
-	if !cmdline.Datacenter() {
-		for {
-			b := utils.FileExists(pwd + "/.git")
-			if b {
-				break
-			}
-			pwd = filepath.Dir(pwd)
-			if len(pwd) < 2 {
-				return fmt.Errorf("current directory not at a sensible place where we can find scripts\n")
+	/*
+		if !cmdline.Datacenter() {
+			for {
+				b := utils.FileExists(pwd + "/.git")
+				if b {
+					break
+				}
+				xpwd := filepath.Dir(pwd)
+				if len(xpwd) < 2 {
+					return fmt.Errorf("current (%s) directory not at a sensible place where we can find scripts\n", xpwd)
+				}
+				pwd = xpwd
 			}
 		}
-	}
+	*/
 	//	psql, err = sql.OpenWithInfo(*dbhost, *dbdb, *dbuser, *dbpw)
 	psql, err = sql.Open()
 	if err != nil {

@@ -33,6 +33,7 @@ TODO: use symlink (and os.Args[0]) instead?
 func (h *HTTPRequest) writeHook(enable bool, name string) error {
 	hook_binaries := []string{
 		fmt.Sprintf("%s/dist/linux/amd64/git-hook", h.pwd()),
+		"/usr/local/bin/git-hook",
 		"/home/cnw/go/bin/git-hook",
 	}
 
