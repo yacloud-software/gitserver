@@ -28,6 +28,8 @@ var (
 	create      = flag.Bool("create", false, "create a repo")
 	aname       = flag.String("artefactname", "", "artefactname")
 	repoid      = flag.Int("repoid", 0, "repo id to operate on")
+	repourl     = flag.String("repourl", "", "repo url to operate on")
+	print_desc  = flag.Bool("print_desc", false, "if true print repository description")
 	print_cpu   = flag.Bool("print_cpu", true, "print cpu utilisation")
 	host        = flag.String("host", "", "hostname to serve repo on")
 	path        = flag.String("path", "", "pathname to serve repo on (the repository name as far as git is concerned)")
@@ -40,6 +42,10 @@ var (
 
 func main() {
 	flag.Parse()
+	if *print_desc {
+		utils.Bail("failed to print description: ", printDesc())
+		os.Exit(0)
+	}
 	if *rebuild != 0 {
 		utils.Bail("rebuild failed", Rebuild())
 		os.Exit(0)
@@ -227,4 +233,30 @@ func parseCommaDelimetedList(f string) []string {
 		res = append(res, s)
 	}
 	return res
+}
+
+func GetRepo() (*pb.SourceRepository, error) {
+	var res *pb.SourceRepository
+	var err error
+	c := authremote.Context()
+	if *repoid != 0 {
+		res, err = pb.GetGIT2Client().RepoByID(c, &pb.ByIDRequest{ID: uint64(*repoid)})
+	} else if *repourl != "" {
+		res, err = pb.GetGIT2Client().RepoByURL(c, &pb.ByURLRequest{URL: *repourl})
+	} else {
+		err = fmt.Errorf("neither -repoid nor -repourl specified")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func printDesc() error {
+	sr, err := GetRepo()
+	if err != nil {
+		return err
+	}
+	fmt.Printf(sr.Description)
+	return nil
 }
