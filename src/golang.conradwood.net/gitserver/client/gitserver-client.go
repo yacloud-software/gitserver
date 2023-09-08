@@ -38,6 +38,7 @@ var (
 	debug       = flag.Bool("debug", false, "debug mode")
 	builds      = flag.Bool("builds", false, "do builds")
 	rebuild     = flag.Uint64("rebuild", 0, "trigger a build")
+	disablemsg  = flag.String("disable_msg", "", "if set, disable a repo with this message")
 )
 
 func main() {

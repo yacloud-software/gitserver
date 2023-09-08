@@ -43,7 +43,18 @@ func (g *GIT2) init() error {
 	g.repocreatelog_store = db.DefaultDBCreateRepoLog()
 	g.build_store = db.DefaultDBBuild()
 	return nil
-
+}
+func (g *GIT2) SetDenyMessage(ctx context.Context, req *gitpb.DenyMessageRequest) (*common.Void, error) {
+	repo, err := g.RepoByID(ctx, &gitpb.ByIDRequest{ID: req.RepositoryID})
+	if err != nil {
+		return nil, err
+	}
+	repo.DenyMessage = req.DenyMessage
+	err = g.repo_store.Update(ctx, repo)
+	if err != nil {
+		return nil, err
+	}
+	return &common.Void{}, nil
 }
 func (g *GIT2) RepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepository, error) {
 	sr, err := g.FindRepoByURL(ctx, req)
