@@ -277,7 +277,10 @@ message RepoUpdateRequest {
 message SourceRepositoryResponse {
   bool Found=1;
   SourceRepository Repository=2;
-    
+}
+message DenyMessageRequest {
+  uint64 RepositoryID=1;
+  string DenyMessage=2;
 }
 /*
  a new implementation of git server
@@ -334,6 +337,8 @@ service GIT2 {
     verify if configuration changes on the buildserver result in a successful build.
   */
   rpc Rebuild(RebuildRequest) returns (stream HookResponse);
+  // set (or clear) a repository deny message
+  rpc SetDenyMessage(DenyMessageRequest) returns (common.Void);
 }
 
 /*********************************
