@@ -182,6 +182,7 @@ message SourceRepository {
   string BuildRoutingTagValue=19; // if present (non-empty), the routing tag value for choosing the gitbuilder
   bool ReadOnly=20; // if true can only be read (with some services being excempt)
   string CreateUser=21; // user who created it
+  string DenyMessage=22; // if set a special access message printed to the git-client on access (all access is denied)
 }
 // the URL a given repository can be accessed under.
 // Note: Repositories may be accessed under multiple different URLs
