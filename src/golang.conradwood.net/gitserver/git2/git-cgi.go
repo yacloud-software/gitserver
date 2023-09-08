@@ -14,6 +14,7 @@ import (
 	"net/http/cgi"
 	"net/url"
 	"strings"
+	"unicode"
 )
 
 const (
@@ -49,7 +50,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 	p := h.repo.OnDiskPath() + on
 	if h.repo.gitrepo.Forking {
 		fmt.Printf("Warning - Access to repo %d, but it is still forking\n", h.repo.gitrepo.ID)
-		h.repo.forkedRepo, err = db.NewDBSourceRepository(psql).ByID(ctx, h.repo.gitrepo.ForkedFrom)
+		h.repo.forkedRepo, err = db.DefaultDBSourceRepository().ByID(ctx, h.repo.gitrepo.ForkedFrom)
 		if err != nil {
 			h.Error(err)
 			return
@@ -77,6 +78,18 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 	}
 	if *debug {
 		h.Printf("    Fake URL: \"%s\"\n", newreq.URL.String())
+	}
+	if h.repo.gitrepo.DenyMessage != "" {
+		stars := "*********************************************************\n"
+		empty := " \n"
+		s := fmt.Sprintf("%s%s%s\n%s%s", stars, empty, h.repo.gitrepo.DenyMessage, empty, stars)
+		h.Printf("%s", s)
+		h.w.WriteHeader(http.StatusForbidden)
+		for _, line := range strings.Split(s, "\n") {
+			line = line + "\n"
+			h.w.Write([]byte(line))
+		}
+		return
 	}
 	//	newreq.Method = h.r.Method
 	// set up the environment for the cgi
@@ -108,6 +121,7 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 			env = append(env, ncs)
 			env = append(env, fmt.Sprintf("GITSERVER_KEY=%s", h.key))
 			env = append(env, fmt.Sprintf("GITSERVER_DIR=%s", h.pwd()))
+			env = append(env, fmt.Sprintf("GIT_HTTP_MAX_REQUEST_BUFFER=200M"))
 			env = append(env, fmt.Sprintf("GITSERVER_TCP_PORT=%d", *config.Gitport))
 			env = append(env, fmt.Sprintf("GITSERVER_GRPC_PORT=%d", *grpc_port))
 			env = append(env, fmt.Sprintf("GITINFO=%s", gp))
@@ -127,15 +141,36 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 	}
 	crw := &cgiResponseWriter{h: h}
 	ch.ServeHTTP(crw, &newreq)
-
 }
 
 type cgilogger struct {
 }
 
 func (c *cgilogger) Write(buf []byte) (int, error) {
-	fmt.Printf("%s\n", string(buf))
+	s := string(buf)
+	for _, line := range strings.Split(s, "\n") {
+		if isprintableLine(line) {
+			fmt.Printf("%s\n", line)
+		}
+	}
+	//	fmt.Printf("%s\n", string(buf))
 	return len(buf), nil
+}
+func isprintableLine(line string) bool {
+	if len(line) == 0 {
+		return false
+	}
+	not_printable := 1.0
+	for _, c := range line {
+		if unicode.IsPrint(c) {
+			not_printable++
+		}
+	}
+	f := float64(len(line))
+	if (not_printable / f * 100) > 10 {
+		return false
+	}
+	return true
 }
 
 type cgiResponseWriter struct {
@@ -147,7 +182,12 @@ func (c *cgiResponseWriter) Header() http.Header {
 }
 func (c *cgiResponseWriter) Write(buf []byte) (int, error) {
 	if *debug_cgi {
-		fmt.Printf("cgi said: %s\n", string(buf))
+		s := string(buf)
+		for _, line := range strings.Split(s, "\n") {
+			if isprintableLine(line) {
+				fmt.Printf("%s\n", line)
+			}
+		}
 	}
 	n, err := c.h.w.Write(buf)
 	if err != nil {

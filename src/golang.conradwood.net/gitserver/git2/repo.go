@@ -28,7 +28,7 @@ type Repo struct {
 
 func RepoFromURL(ctx context.Context, host string, git_url *GitURL) (*Repo, error) {
 	path := git_url.RepoPath()
-	surls, err := db.NewDBSourceRepositoryURL(psql).ByPath(ctx, path)
+	surls, err := db.DefaultDBSourceRepositoryURL().ByPath(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func RepoFromURL(ctx context.Context, host string, git_url *GitURL) (*Repo, erro
 	}
 
 	res := &Repo{}
-	g, err := db.NewDBSourceRepository(psql).ByID(ctx, surl.V2RepositoryID)
+	g, err := db.DefaultDBSourceRepository().ByID(ctx, surl.V2RepositoryID)
 	if err != nil {
 		return nil, err
 	}

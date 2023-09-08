@@ -38,10 +38,10 @@ type GIT2 struct {
 }
 
 func (g *GIT2) init() error {
-	g.url_store = db.NewDBSourceRepositoryURL(psql)
-	g.repo_store = db.NewDBSourceRepository(psql)
-	g.repocreatelog_store = db.NewDBCreateRepoLog(psql)
-	g.build_store = db.NewDBBuild(psql)
+	g.url_store = db.DefaultDBSourceRepositoryURL()
+	g.repo_store = db.DefaultDBSourceRepository()
+	g.repocreatelog_store = db.DefaultDBCreateRepoLog()
+	g.build_store = db.DefaultDBBuild()
 	return nil
 
 }

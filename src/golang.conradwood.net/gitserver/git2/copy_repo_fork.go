@@ -51,7 +51,7 @@ func (ct *CopyTrigger) Debugf(format string, args ...interface{}) {
 func (ct *CopyTrigger) Copy() error {
 	// refresh copy to check if it has stopped 'forking' meanwhile
 	ctx := authremote.Context()
-	fr, err := db.NewDBSourceRepository(psql).ByID(ctx, ct.dest.ID)
+	fr, err := db.DefaultDBSourceRepository().ByID(ctx, ct.dest.ID)
 	if err != nil {
 		return err
 	}
@@ -70,12 +70,12 @@ func (ct *CopyTrigger) Copy() error {
 	}
 	// now update database to say it is no longer forking
 	ctx = authremote.Context()
-	fr, err = db.NewDBSourceRepository(psql).ByID(ctx, ct.dest.ID)
+	fr, err = db.DefaultDBSourceRepository().ByID(ctx, ct.dest.ID)
 	if err != nil {
 		return err
 	}
 	fr.Forking = false
-	err = db.NewDBSourceRepository(psql).Update(ctx, fr)
+	err = db.DefaultDBSourceRepository().Update(ctx, fr)
 	if err != nil {
 		return err
 	}

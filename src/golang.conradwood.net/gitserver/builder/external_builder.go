@@ -147,7 +147,7 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 	}
 
 	//run external builder..
-	urls, err := db.NewDBSourceRepositoryURL(psql).ByV2RepositoryID(ctx, gt.RepositoryID())
+	urls, err := db.DefaultDBSourceRepositoryURL().ByV2RepositoryID(ctx, gt.RepositoryID())
 	if err != nil {
 		return err
 	}
