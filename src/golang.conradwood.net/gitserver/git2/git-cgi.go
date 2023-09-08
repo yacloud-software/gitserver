@@ -79,18 +79,6 @@ func (h *HTTPRequest) InvokeGitCGI(ctx context.Context) {
 	if *debug {
 		h.Printf("    Fake URL: \"%s\"\n", newreq.URL.String())
 	}
-	if h.repo.gitrepo.DenyMessage != "" {
-		stars := "*********************************************************\n"
-		empty := " \n"
-		s := fmt.Sprintf("%s%s%s\n%s%s", stars, empty, h.repo.gitrepo.DenyMessage, empty, stars)
-		h.Printf("%s", s)
-		h.w.WriteHeader(http.StatusForbidden)
-		for _, line := range strings.Split(s, "\n") {
-			line = line + "\n"
-			h.w.Write([]byte(line))
-		}
-		return
-	}
 	//	newreq.Method = h.r.Method
 	// set up the environment for the cgi
 

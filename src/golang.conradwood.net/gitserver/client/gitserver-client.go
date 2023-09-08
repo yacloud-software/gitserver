@@ -38,11 +38,16 @@ var (
 	debug       = flag.Bool("debug", false, "debug mode")
 	builds      = flag.Bool("builds", false, "do builds")
 	rebuild     = flag.Uint64("rebuild", 0, "trigger a build")
-	disablemsg  = flag.String("disable_msg", "", "if set, disable a repo with this message")
+	denymsg     = flag.Bool("denymsg", false, "if set, disable a repo with the message. ")
+	message     = flag.String("message", "", "the message to set or clear")
 )
 
 func main() {
 	flag.Parse()
+	if *denymsg {
+		utils.Bail("failed to set deny message: ", denyMsg())
+		os.Exit(0)
+	}
 	if *print_desc {
 		utils.Bail("failed to print description: ", printDesc())
 		os.Exit(0)
@@ -258,6 +263,24 @@ func printDesc() error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf(sr.Description)
+	s := strings.TrimSuffix(sr.Description, "\n") + "\n"
+	fmt.Printf(s)
+	return nil
+}
+func denyMsg() error {
+	sr, err := GetRepo()
+	if err != nil {
+		return err
+	}
+	req := &pb.DenyMessageRequest{
+		RepositoryID: sr.ID,
+		DenyMessage:  *message,
+	}
+	ctx := authremote.Context()
+	_, err = pb.GetGIT2Client().SetDenyMessage(ctx, req)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Set Denymessage of repository #%d to \"%s\"\n", req.RepositoryID, req.DenyMessage)
 	return nil
 }

@@ -220,6 +220,18 @@ func (h *HTTPRequest) ServeHTTP() {
 		h.ErrorCode(404, "no such repo")
 		return
 	}
+	if h.repo.gitrepo.DenyMessage != "" {
+		stars := "*********************************************************\n"
+		empty := " \n"
+		s := fmt.Sprintf("%s%s%s\n%s%s", stars, empty, h.repo.gitrepo.DenyMessage, empty, stars)
+		h.Printf("%s", s)
+		h.w.WriteHeader(http.StatusForbidden)
+		for _, line := range strings.Split(s, "\n") {
+			line = line + "\n"
+			h.w.Write([]byte(line))
+		}
+		return
+	}
 	if !h.repo.ExistsOnDisk() {
 		h.ErrorCode(404, "no such repo directory")
 		return
