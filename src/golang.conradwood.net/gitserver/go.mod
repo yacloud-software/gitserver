@@ -11,7 +11,7 @@ require (
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.2527
 	golang.conradwood.net/apis/slackgateway v1.1.2525
-	golang.conradwood.net/go-easyops v0.1.20076
+	golang.conradwood.net/go-easyops v0.1.20106
 	golang.org/x/sys v0.11.0
 	google.golang.org/grpc v1.57.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -37,7 +37,6 @@ require (
 	golang.conradwood.net/apis/h2gproxy v1.1.2525 // indirect
 	golang.conradwood.net/apis/objectstore v1.1.2527 // indirect
 	golang.conradwood.net/apis/registry v1.1.2527 // indirect
-	golang.conradwood.net/apis/rpcinterceptor v1.1.2525 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.yacloud.eu/apis/session v1.1.2527 // indirect
