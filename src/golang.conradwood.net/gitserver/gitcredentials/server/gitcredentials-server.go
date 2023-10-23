@@ -27,7 +27,7 @@ func main() {
 	//	utils.Bail("failed to create tables", gitcreddb.CreateTable(context.Background()))
 	cserver := &CServer{}
 	sd := server.NewServerDef()
-	sd.Port = *grpc_port
+	sd.SetPort(*grpc_port)
 	sd.Register = server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGITCredentialsServer(server, cserver)
 		return nil

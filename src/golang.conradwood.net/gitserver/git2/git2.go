@@ -84,7 +84,7 @@ func Start() error {
 	}
 
 	sd := server.NewHTMLServerDef("gitserver.GIT2")
-	sd.Port = *http_port
+	sd.SetPort(*http_port)
 	server.AddRegistry(sd)
 	fmt.Printf("GIT2 http server started on port %d\n", *http_port)
 
@@ -93,7 +93,7 @@ func Start() error {
 		return err
 	}
 	sd = server.NewServerDef()
-	sd.Port = *grpc_port
+	sd.SetPort(*grpc_port)
 	sd.Register = server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGIT2Server(server, gserver)
 		return nil
