@@ -113,16 +113,27 @@ func (g *GIT2) GetReposWithFilter(ctx context.Context, req *gitpb.RepoFilter) (*
 	if err != nil {
 		return nil, err
 	}
-	u := auth.GetUser(ctx)
-	if u == nil {
-		return nil, errors.Unauthenticated(ctx, "no user: no repos")
-	}
-	//	fmt.Printf("GetRepos() - got %d repos\n", len(repos))
 	res := &gitpb.SourceRepositoryList{}
-	ot := &oa.ObjectType{ObjectType: oa.OBJECTTYPE_GitRepository}
-	ol, err := oa.GetObjectAuthClient().AvailableObjects(ctx, ot)
-	if err != nil {
-		return nil, err
+
+	// disable "normal" access check and return all repos matching the filter
+	use_all_objects := false
+
+	if HasServiceReadAccess(ctx, oa.OBJECTTYPE_GitRepository) {
+		use_all_objects = true
+	}
+
+	ol := &oa.ObjectIDList{}
+	if !use_all_objects {
+		u := auth.GetUser(ctx)
+		if u == nil {
+			return nil, errors.Unauthenticated(ctx, "no user: no repos")
+		}
+		//	fmt.Printf("GetRepos() - got %d repos\n", len(repos))
+		ot := &oa.ObjectType{ObjectType: oa.OBJECTTYPE_GitRepository}
+		ol, err = oa.GetObjectAuthClient().AvailableObjects(ctx, ot)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for _, sr := range repos {
 		if sr.Deleted {
@@ -136,10 +147,14 @@ func (g *GIT2) GetReposWithFilter(ctx context.Context, req *gitpb.RepoFilter) (*
 			continue
 		}
 		include := false
-		for _, id := range ol.ObjectIDs {
-			if id == sr.ID {
-				include = true
-				break
+		if use_all_objects {
+			include = true
+		} else {
+			for _, id := range ol.ObjectIDs {
+				if id == sr.ID {
+					include = true
+					break
+				}
 			}
 		}
 		if include || *disable_access_check {
