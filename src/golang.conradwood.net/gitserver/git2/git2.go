@@ -94,10 +94,10 @@ func Start() error {
 	}
 	sd = server.NewServerDef()
 	sd.SetPort(*grpc_port)
-	sd.Register = server.Register(func(server *grpc.Server) error {
+	sd.SetRegister(server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGIT2Server(server, gserver)
 		return nil
-	})
+	}))
 	go func() {
 		err := server.ServerStartup(sd)
 		utils.Bail("failed to start git2 grpc server", err)
@@ -418,3 +418,4 @@ func get_current_user() *auth.User {
 	return u
 
 }
+

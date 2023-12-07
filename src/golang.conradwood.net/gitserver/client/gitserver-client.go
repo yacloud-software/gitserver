@@ -284,3 +284,4 @@ func denyMsg() error {
 	fmt.Printf("Set Denymessage of repository #%d to \"%s\"\n", req.RepositoryID, req.DenyMessage)
 	return nil
 }
+

@@ -51,3 +51,4 @@ func init() {
    client.RegisterDependency("gitserver.GIT2")
    AddService("gitserver.GIT2")
 }
+

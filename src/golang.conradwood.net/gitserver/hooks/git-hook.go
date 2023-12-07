@@ -41,3 +41,4 @@ func main() {
 	utils.Bail(fmt.Sprintf("hook \"%s\" failed", *hook_type), err)
 
 }
+

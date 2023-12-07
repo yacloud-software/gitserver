@@ -192,3 +192,4 @@ func (c *cgiResponseWriter) Write(buf []byte) (int, error) {
 func (c *cgiResponseWriter) WriteHeader(statusCode int) {
 	c.h.w.WriteHeader(statusCode)
 }
+

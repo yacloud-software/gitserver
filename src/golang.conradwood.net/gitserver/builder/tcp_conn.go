@@ -68,3 +68,4 @@ func (t *TCPConn) Printf(format string, a ...interface{}) {
 	t.conn.Write([]byte(msg))
 	fmt.Print("[hook] " + msg)
 }
+

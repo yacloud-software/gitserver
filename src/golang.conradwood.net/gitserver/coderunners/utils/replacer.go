@@ -55,3 +55,4 @@ func (r *Replace) Add(first string, end string, replace string) {
 	rp := &replacePattern{first: first, end: end, replace: replace}
 	r.patterns = append(r.patterns, rp)
 }
+

@@ -82,3 +82,4 @@ func (ct *CopyTrigger) Copy() error {
 	ct.Debugf("Copy complete and database updated")
 	return nil
 }
+

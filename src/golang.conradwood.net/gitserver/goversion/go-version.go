@@ -142,3 +142,4 @@ func (b *BuildDef) buildfile(filename string) {
 	err = ioutil.WriteFile(filename, []byte(ns), 0755)
 	utils.Bail("Failed to write file", err)
 }
+

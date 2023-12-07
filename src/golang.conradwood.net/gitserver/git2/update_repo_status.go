@@ -102,3 +102,4 @@ func (g *GIT2) GitRepoUpdate(ctx context.Context, req *gitpb.RepoUpdateRequest) 
 	return ri, nil
 
 }
+

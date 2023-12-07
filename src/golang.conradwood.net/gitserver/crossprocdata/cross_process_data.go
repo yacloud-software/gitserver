@@ -31,3 +31,4 @@ func GetLocalData(key string) *LocalData {
 func SaveLocalData(key string, ld *LocalData) {
 	local_cache.Put(key, ld)
 }
+

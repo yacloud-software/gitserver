@@ -520,3 +520,4 @@ func (b *Builder) updateBuild() error {
 
 	return nil
 }
+

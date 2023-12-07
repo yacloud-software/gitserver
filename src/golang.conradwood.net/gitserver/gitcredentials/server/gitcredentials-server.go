@@ -28,10 +28,10 @@ func main() {
 	cserver := &CServer{}
 	sd := server.NewServerDef()
 	sd.SetPort(*grpc_port)
-	sd.Register = server.Register(func(server *grpc.Server) error {
+	sd.SetRegister(server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGITCredentialsServer(server, cserver)
 		return nil
-	})
+	}))
 	err = server.ServerStartup(sd)
 	utils.Bail("failed to start git credentials grpc server", err)
 
@@ -87,3 +87,4 @@ func (c *CServer) GitInvoked(ctx context.Context, req *gitpb.GitCredentialsReque
 	}
 	return res, nil
 }
+

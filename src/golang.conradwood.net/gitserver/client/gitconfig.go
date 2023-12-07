@@ -57,3 +57,4 @@ func (g *GitConfig) GetEntry(section, key string) string {
 	}
 	return ""
 }
+

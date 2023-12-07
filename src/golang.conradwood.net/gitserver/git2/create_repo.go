@@ -172,3 +172,4 @@ func (h *HTTPRequest) GetCreateLog() (*gitpb.CreateRepoLog, error) {
 	crp := crpx[0]
 	return crp, nil
 }
+

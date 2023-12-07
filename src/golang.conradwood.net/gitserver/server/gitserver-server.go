@@ -20,3 +20,4 @@ func main() {
 	utils.Bail("failed to start git2...\n", err)
 	select {}
 }
+

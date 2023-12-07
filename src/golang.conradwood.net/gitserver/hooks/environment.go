@@ -59,3 +59,4 @@ func (e *Environment) IsYacloudAdmin() bool {
 	// in group "8" (yacloud-admin) ?
 	return auth.IsInGroup(e.ctx, "8")
 }
+

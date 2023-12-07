@@ -188,3 +188,4 @@ func (c *checker) GitBareDir() string {
 	return *config.Gitroot + "/" + c.repo.SourceRepo.FilePath
 
 }
+

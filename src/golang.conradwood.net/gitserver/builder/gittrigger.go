@@ -95,3 +95,4 @@ func (g *GitTrigger) ArtefactID() uint64 {
 func (g *GitTrigger) RepositoryID() uint64 {
 	return g.gitinfo.RepositoryID
 }
+

@@ -47,3 +47,4 @@ func get_service_access_rights(ctx context.Context, ot oa.OBJECTTYPE) *oa.AllAcc
 	//fmt.Printf("ServiceAccess: %#v\n", res)
 	return res
 }
+

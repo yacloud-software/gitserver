@@ -76,3 +76,4 @@ func (r *Repo) ExistsOnDisk() bool {
 func (r *Repo) AbsDirectory() string {
 	return *config.Gitroot + "/" + r.OnDiskPath()
 }
+

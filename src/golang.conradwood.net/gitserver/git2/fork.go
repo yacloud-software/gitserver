@@ -118,3 +118,4 @@ func (g *GIT2) Fork(ctx context.Context, req *gitpb.ForkRequest) (*gitpb.SourceR
 	sr.URLs = []*gitpb.SourceRepositoryURL{req.URL}
 	return sr, nil
 }
+
