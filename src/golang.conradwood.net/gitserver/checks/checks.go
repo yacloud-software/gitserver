@@ -189,3 +189,4 @@ func (c *checker) GitBareDir() string {
 
 }
 
+

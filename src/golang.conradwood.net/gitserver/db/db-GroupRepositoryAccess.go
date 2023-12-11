@@ -405,3 +405,4 @@ func (a *DBGroupRepositoryAccess) Error(ctx context.Context, q string, e error) 
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
 
+

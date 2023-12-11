@@ -77,3 +77,4 @@ func (r *Repo) AbsDirectory() string {
 	return *config.Gitroot + "/" + r.OnDiskPath()
 }
 
+

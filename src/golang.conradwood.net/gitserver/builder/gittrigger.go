@@ -96,3 +96,4 @@ func (g *GitTrigger) RepositoryID() uint64 {
 	return g.gitinfo.RepositoryID
 }
 
+
