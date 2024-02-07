@@ -552,6 +552,10 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 	return nil
 }
 func (g *GIT2) GetLatestSuccessfulBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
+	err := wants_access_to_build(ctx, req.ID) // despite the name, input *is* a repositoryid
+	if err != nil {
+		return nil, err
+	}
 	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 and success = true order by id desc limit 1", req.ID)
 	if err != nil {
 		return nil, err
@@ -560,13 +564,13 @@ func (g *GIT2) GetLatestSuccessfulBuild(ctx context.Context, req *gitpb.ByIDRequ
 		return nil, errors.NotFound(ctx, "no build for repo %d", req.ID)
 	}
 	res := builds[0]
-	err = wants_access_to_build(ctx, res.RepositoryID)
-	if err != nil {
-		return nil, err
-	}
 	return res, nil
 }
 func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
+	err := wants_access_to_build(ctx, req.ID) // despite the name, input *is* a repositoryid
+	if err != nil {
+		return nil, err
+	}
 
 	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 order by id desc limit 1", req.ID)
 	if err != nil {
@@ -576,10 +580,6 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 		return nil, errors.NotFound(ctx, "no build for repo %d", req.ID)
 	}
 	res := builds[0]
-	err = wants_access_to_build(ctx, res.RepositoryID)
-	if err != nil {
-		return nil, err
-	}
 	return res, nil
 }
 func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*gitpb.SourceRepositoryResponse, error) {
