@@ -318,9 +318,9 @@ service GIT2 {
   rpc GetReposTags(RepoTagRequest) returns (SourceRepositoryList);
   // get recent builds
   rpc GetRecentBuilds(ByIDRequest) returns (BuildList);
-  // get most recent (possibly failed) build
+  // get most recent (possibly failed) build by repositoryid
   rpc GetLatestBuild(ByIDRequest) returns (Build);
-  // get most recent successful build
+  // get most recent successful build by repositoryID
   rpc GetLatestSuccessfulBuild(ByIDRequest) returns (Build);
   // make repobuilder no longer read-only
   rpc UpdateRepoStatus(UpdateRepoStatusRequest) returns (SourceRepository);
