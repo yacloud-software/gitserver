@@ -83,16 +83,16 @@ func Start() error {
 		return err
 	}
 
-	sd := server.NewHTMLServerDef("gitserver.GIT2")
-	sd.SetPort(*http_port)
-	server.AddRegistry(sd)
+	hsd := server.NewHTMLServerDef("gitserver.GIT2")
+	hsd.SetPort(*http_port)
+	server.AddRegistry(hsd)
 	fmt.Printf("GIT2 http server started on port %d\n", *http_port)
 
 	err = gserver.init()
 	if err != nil {
 		return err
 	}
-	sd = server.NewServerDef()
+	sd := server.NewServerDef()
 	sd.SetPort(*grpc_port)
 	sd.SetRegister(server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGIT2Server(server, gserver)
@@ -418,6 +418,3 @@ func get_current_user() *auth.User {
 	return u
 
 }
-
-
-
