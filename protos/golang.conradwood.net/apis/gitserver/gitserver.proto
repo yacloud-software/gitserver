@@ -64,7 +64,14 @@ message CreateRepoLog {
   uint32 Finished = 9;          // when did this step complete?
   string AssociationToken = 10; // a semi random text to associate GIT/URL Access with create log. Once finished, this token should not be reused
 }
+message GitAccessLog {
+  uint64 ID=1;
+  bool Write=2;
+  string UserID=4;
+  uint32 Timestamp=6;
+  SourceRepository SourceRepository=7 [(common.sql_type)="uint64",(common.sql_reference)="sourcerepository.id"];
 
+}
 message Build {
   uint64 ID = 1;
   uint64 RepositoryID = 2;
@@ -282,6 +289,14 @@ message DenyMessageRequest {
   uint64 RepositoryID=1;
   string DenyMessage=2;
 }
+
+message NumberCommitsUserRequest {
+  string UserID=1;
+  uint32 Timestamp=2;
+}
+message NumberCommitsUserResponse {
+  uint32 Commits=1;
+}
 /*
  a new implementation of git server
  Major Differences to GIT1:
@@ -339,6 +354,10 @@ service GIT2 {
   rpc Rebuild(RebuildRequest) returns (stream HookResponse);
   // set (or clear) a repository deny message
   rpc SetDenyMessage(DenyMessageRequest) returns (common.Void);
+  // get number of commits for a particular user upto a certain point of time (across all repos)
+  // this answers the question: "How many commits did User push before time X?"
+  // note the absense of a repository - this queries across all repositories, including deleted ones.
+  rpc GetNumberCommitsUser(NumberCommitsUserRequest) returns (NumberCommitsUserResponse);
 }
 
 /*********************************
