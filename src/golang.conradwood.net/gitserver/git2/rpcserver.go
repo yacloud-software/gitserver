@@ -626,6 +626,9 @@ func (g *GIT2) GetNumberCommitsUser(ctx context.Context, req *gitpb.NumberCommit
 		if c.Timestamp < req.Timestamp {
 			continue
 		}
+		if !c.Write {
+			continue
+		}
 		val++
 	}
 	return &gitpb.NumberCommitsUserResponse{Commits: val}, nil
