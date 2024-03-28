@@ -623,7 +623,7 @@ func (g *GIT2) GetNumberCommitsUser(ctx context.Context, req *gitpb.NumberCommit
 	}
 	val := uint32(0)
 	for _, c := range commits {
-		if c.Timestamp < req.Timestamp {
+		if c.Timestamp > req.Timestamp {
 			continue
 		}
 		if !c.Write {
