@@ -100,7 +100,7 @@ func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBGitCredentials) Save(ctx context.Context, p *savepb.GitCredentials) (uint64, error) {
 	qn := "DBGitCredentials_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, host, path, username, password, expiry) values ($1, $2, $3, $4, $5, $6) returning id", p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, host, path, username, password, expiry) values ($1, $2, $3, $4, $5, $6) returning id", a.get_UserID(p), a.get_Host(p), a.get_Path(p), a.get_Username(p), a.get_Password(p), a.get_Expiry(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -126,7 +126,7 @@ func (a *DBGitCredentials) SaveWithID(ctx context.Context, p *savepb.GitCredenti
 
 func (a *DBGitCredentials) Update(ctx context.Context, p *savepb.GitCredentials) error {
 	qn := "DBGitCredentials_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, host=$2, path=$3, username=$4, password=$5, expiry=$6 where id = $7", p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, host=$2, path=$3, username=$4, password=$5, expiry=$6 where id = $7", a.get_UserID(p), a.get_Host(p), a.get_Path(p), a.get_Username(p), a.get_Password(p), a.get_Expiry(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -380,6 +380,38 @@ func (a *DBGitCredentials) ByLikeExpiry(ctx context.Context, p uint32) ([]*savep
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBGitCredentials) get_ID(p *savepb.GitCredentials) uint64 {
+	return p.ID
+}
+
+func (a *DBGitCredentials) get_UserID(p *savepb.GitCredentials) string {
+	return p.UserID
+}
+
+func (a *DBGitCredentials) get_Host(p *savepb.GitCredentials) string {
+	return p.Host
+}
+
+func (a *DBGitCredentials) get_Path(p *savepb.GitCredentials) string {
+	return p.Path
+}
+
+func (a *DBGitCredentials) get_Username(p *savepb.GitCredentials) string {
+	return p.Username
+}
+
+func (a *DBGitCredentials) get_Password(p *savepb.GitCredentials) string {
+	return p.Password
+}
+
+func (a *DBGitCredentials) get_Expiry(p *savepb.GitCredentials) uint32 {
+	return p.Expiry
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -406,7 +438,7 @@ func (a *DBGitCredentials) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".host, " + a.SQLTablename + ".path, " + a.SQLTablename + ".username, " + a.SQLTablename + ".password, " + a.SQLTablename + ".expiry"
 }
 
-func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
+func (a *DBGitCredentials) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
 	var res []*savepb.GitCredentials
 	for rows.Next() {
 		foo := savepb.GitCredentials{}
@@ -415,6 +447,30 @@ func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*s
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
+	var res []*savepb.GitCredentials
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.GitCredentials{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.UserID
+		scanTarget_2 := &foo.Host
+		scanTarget_3 := &foo.Path
+		scanTarget_4 := &foo.Username
+		scanTarget_5 := &foo.Password
+		scanTarget_6 := &foo.Expiry
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4, scanTarget_5, scanTarget_6)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -427,20 +483,21 @@ func (a *DBGitCredentials) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,host text not null ,path text not null ,username text not null ,password text not null ,expiry integer not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,host text not null ,path text not null ,username text not null ,password text not null ,expiry integer not null );`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS path text not null default '';`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS username text not null default '';`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS password text not null default '';`,
-		`ALTER TABLE gitcredentials ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS path text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS username text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS password text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
 
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS path text not null default '';`,
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS username text not null default '';`,
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS password text not null default '';`,
-		`ALTER TABLE gitcredentials_archive ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS host text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS path text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS username text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS password text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS expiry integer not null  default 0;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -470,6 +527,4 @@ func (a *DBGitCredentials) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

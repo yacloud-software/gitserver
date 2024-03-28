@@ -1,6 +1,7 @@
 package git2
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"golang.conradwood.net/apis/auth"
@@ -8,6 +9,7 @@ import (
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/config"
 	"golang.conradwood.net/gitserver/crossprocdata"
+	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/gitserver/query"
 	au "golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
@@ -272,7 +274,17 @@ func (h *HTTPRequest) ServeHTTP() {
 			return
 		}
 	}
-
+	gal := &gitpb.GitAccessLog{
+		Write:            h.isWrite(),
+		Timestamp:        uint32(time.Now().Unix()),
+		UserID:           h.user.ID,
+		SourceRepository: h.repo.gitrepo,
+	}
+	_, err = db.DefaultDBGitAccessLog().Save(context.Background(), gal)
+	if err != nil {
+		h.Error(err)
+		return
+	}
 	h.InvokeGitCGI(ctx)
 
 }

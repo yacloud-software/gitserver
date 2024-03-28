@@ -97,7 +97,7 @@ func (a *DBRepository) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBRepository) Save(ctx context.Context, p *savepb.Repository) (uint64, error) {
 	qn := "DBRepository_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (reponame, ownerid, artefactname) values ($1, $2, $3) returning id", p.RepoName, p.OwnerID, p.ArtefactName)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (reponame, ownerid, artefactname) values ($1, $2, $3) returning id", a.get_RepoName(p), a.get_OwnerID(p), a.get_ArtefactName(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -123,7 +123,7 @@ func (a *DBRepository) SaveWithID(ctx context.Context, p *savepb.Repository) err
 
 func (a *DBRepository) Update(ctx context.Context, p *savepb.Repository) error {
 	qn := "DBRepository_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set reponame=$1, ownerid=$2, artefactname=$3 where id = $4", p.RepoName, p.OwnerID, p.ArtefactName, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set reponame=$1, ownerid=$2, artefactname=$3 where id = $4", a.get_RepoName(p), a.get_OwnerID(p), a.get_ArtefactName(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -287,6 +287,26 @@ func (a *DBRepository) ByLikeArtefactName(ctx context.Context, p string) ([]*sav
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBRepository) get_ID(p *savepb.Repository) uint64 {
+	return p.ID
+}
+
+func (a *DBRepository) get_RepoName(p *savepb.Repository) string {
+	return p.RepoName
+}
+
+func (a *DBRepository) get_OwnerID(p *savepb.Repository) string {
+	return p.OwnerID
+}
+
+func (a *DBRepository) get_ArtefactName(p *savepb.Repository) string {
+	return p.ArtefactName
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -313,7 +333,7 @@ func (a *DBRepository) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".reponame, " + a.SQLTablename + ".ownerid, " + a.SQLTablename + ".artefactname"
 }
 
-func (a *DBRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Repository, error) {
+func (a *DBRepository) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.Repository, error) {
 	var res []*savepb.Repository
 	for rows.Next() {
 		foo := savepb.Repository{Permission: &savepb.Permission{}}
@@ -322,6 +342,27 @@ func (a *DBRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savep
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Repository, error) {
+	var res []*savepb.Repository
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.Repository{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.RepoName
+		scanTarget_2 := &foo.OwnerID
+		scanTarget_3 := &foo.ArtefactName
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -334,14 +375,15 @@ func (a *DBRepository) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null ,ownerid text not null ,artefactname text not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),reponame text not null ,ownerid text not null ,artefactname text not null );`,
-		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS reponame text not null default '';`,
-		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS ownerid text not null default '';`,
-		`ALTER TABLE repository ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS reponame text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS ownerid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
 
-		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS reponame text not null default '';`,
-		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS ownerid text not null default '';`,
-		`ALTER TABLE repository_archive ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS reponame text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS ownerid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS artefactname text not null  default '';`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -371,6 +413,4 @@ func (a *DBRepository) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

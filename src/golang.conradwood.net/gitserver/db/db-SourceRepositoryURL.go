@@ -97,7 +97,7 @@ func (a *DBSourceRepositoryURL) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBSourceRepositoryURL) Save(ctx context.Context, p *savepb.SourceRepositoryURL) (uint64, error) {
 	qn := "DBSourceRepositoryURL_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (v2repositoryid, host, path) values ($1, $2, $3) returning id", p.V2RepositoryID, p.Host, p.Path)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (v2repositoryid, host, path) values ($1, $2, $3) returning id", a.get_V2RepositoryID(p), a.get_Host(p), a.get_Path(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -123,7 +123,7 @@ func (a *DBSourceRepositoryURL) SaveWithID(ctx context.Context, p *savepb.Source
 
 func (a *DBSourceRepositoryURL) Update(ctx context.Context, p *savepb.SourceRepositoryURL) error {
 	qn := "DBSourceRepositoryURL_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set v2repositoryid=$1, host=$2, path=$3 where id = $4", p.V2RepositoryID, p.Host, p.Path, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set v2repositoryid=$1, host=$2, path=$3 where id = $4", a.get_V2RepositoryID(p), a.get_Host(p), a.get_Path(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -287,6 +287,26 @@ func (a *DBSourceRepositoryURL) ByLikePath(ctx context.Context, p string) ([]*sa
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBSourceRepositoryURL) get_ID(p *savepb.SourceRepositoryURL) uint64 {
+	return p.ID
+}
+
+func (a *DBSourceRepositoryURL) get_V2RepositoryID(p *savepb.SourceRepositoryURL) uint64 {
+	return p.V2RepositoryID
+}
+
+func (a *DBSourceRepositoryURL) get_Host(p *savepb.SourceRepositoryURL) string {
+	return p.Host
+}
+
+func (a *DBSourceRepositoryURL) get_Path(p *savepb.SourceRepositoryURL) string {
+	return p.Path
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -313,7 +333,7 @@ func (a *DBSourceRepositoryURL) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".v2repositoryid, " + a.SQLTablename + ".host, " + a.SQLTablename + ".path"
 }
 
-func (a *DBSourceRepositoryURL) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepositoryURL, error) {
+func (a *DBSourceRepositoryURL) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepositoryURL, error) {
 	var res []*savepb.SourceRepositoryURL
 	for rows.Next() {
 		foo := savepb.SourceRepositoryURL{}
@@ -322,6 +342,27 @@ func (a *DBSourceRepositoryURL) FromRows(ctx context.Context, rows *gosql.Rows) 
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBSourceRepositoryURL) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepositoryURL, error) {
+	var res []*savepb.SourceRepositoryURL
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.SourceRepositoryURL{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.V2RepositoryID
+		scanTarget_2 := &foo.Host
+		scanTarget_3 := &foo.Path
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -334,14 +375,15 @@ func (a *DBSourceRepositoryURL) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null ,host text not null ,path text not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),v2repositoryid bigint not null ,host text not null ,path text not null );`,
-		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;`,
-		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE sourcerepositoryurl ADD COLUMN IF NOT EXISTS path text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS path text not null default '';`,
 
-		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null default 0;`,
-		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE sourcerepositoryurl_archive ADD COLUMN IF NOT EXISTS path text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS v2repositoryid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS host text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS path text not null  default '';`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -371,6 +413,4 @@ func (a *DBSourceRepositoryURL) Error(ctx context.Context, q string, e error) er
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

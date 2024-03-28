@@ -97,7 +97,7 @@ func (a *DBWatchers) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBWatchers) Save(ctx context.Context, p *savepb.Watchers) (uint64, error) {
 	qn := "DBWatchers_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, repositoryid, notifytype) values ($1, $2, $3) returning id", p.UserID, p.RepositoryID, p.Notifytype)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, repositoryid, notifytype) values ($1, $2, $3) returning id", a.get_UserID(p), a.get_RepositoryID(p), a.get_Notifytype(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -123,7 +123,7 @@ func (a *DBWatchers) SaveWithID(ctx context.Context, p *savepb.Watchers) error {
 
 func (a *DBWatchers) Update(ctx context.Context, p *savepb.Watchers) error {
 	qn := "DBWatchers_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, repositoryid=$2, notifytype=$3 where id = $4", p.UserID, p.RepositoryID, p.Notifytype, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, repositoryid=$2, notifytype=$3 where id = $4", a.get_UserID(p), a.get_RepositoryID(p), a.get_Notifytype(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -287,6 +287,26 @@ func (a *DBWatchers) ByLikeNotifytype(ctx context.Context, p uint32) ([]*savepb.
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBWatchers) get_ID(p *savepb.Watchers) uint64 {
+	return p.ID
+}
+
+func (a *DBWatchers) get_UserID(p *savepb.Watchers) string {
+	return p.UserID
+}
+
+func (a *DBWatchers) get_RepositoryID(p *savepb.Watchers) uint64 {
+	return p.RepositoryID
+}
+
+func (a *DBWatchers) get_Notifytype(p *savepb.Watchers) uint32 {
+	return p.Notifytype
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -313,7 +333,7 @@ func (a *DBWatchers) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".notifytype"
 }
 
-func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Watchers, error) {
+func (a *DBWatchers) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.Watchers, error) {
 	var res []*savepb.Watchers
 	for rows.Next() {
 		foo := savepb.Watchers{}
@@ -322,6 +342,27 @@ func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Watchers, error) {
+	var res []*savepb.Watchers
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.Watchers{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.UserID
+		scanTarget_2 := &foo.RepositoryID
+		scanTarget_3 := &foo.Notifytype
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -334,14 +375,15 @@ func (a *DBWatchers) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
-		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE watchers ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
 
-		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE watchers_archive ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repositoryid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS notifytype integer not null  default 0;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -371,6 +413,4 @@ func (a *DBWatchers) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

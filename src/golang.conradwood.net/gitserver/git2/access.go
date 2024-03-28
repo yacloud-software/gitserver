@@ -155,6 +155,7 @@ func isrepobuilder(ctx context.Context) bool {
 	return false
 }
 
+// despite the name - input parameter is a repositoryid
 func wants_access_to_build(ctx context.Context, repoid uint64) error {
 	if HasServiceAnyAccess(ctx, objectauth.OBJECTTYPE_GitRepository) {
 		return nil
@@ -184,6 +185,3 @@ func wants_access_to_build(ctx context.Context, repoid uint64) error {
 	}
 	return nil
 }
-
-
-

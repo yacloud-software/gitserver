@@ -97,7 +97,7 @@ func (a *DBPingState) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBPingState) Save(ctx context.Context, p *savepb.PingState) (uint64, error) {
 	qn := "DBPingState_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (associationtoken, created, responsetoken) values ($1, $2, $3) returning id", p.AssociationToken, p.Created, p.ResponseToken)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (associationtoken, created, responsetoken) values ($1, $2, $3) returning id", a.get_AssociationToken(p), a.get_Created(p), a.get_ResponseToken(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -123,7 +123,7 @@ func (a *DBPingState) SaveWithID(ctx context.Context, p *savepb.PingState) error
 
 func (a *DBPingState) Update(ctx context.Context, p *savepb.PingState) error {
 	qn := "DBPingState_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set associationtoken=$1, created=$2, responsetoken=$3 where id = $4", p.AssociationToken, p.Created, p.ResponseToken, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set associationtoken=$1, created=$2, responsetoken=$3 where id = $4", a.get_AssociationToken(p), a.get_Created(p), a.get_ResponseToken(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -287,6 +287,26 @@ func (a *DBPingState) ByLikeResponseToken(ctx context.Context, p string) ([]*sav
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBPingState) get_ID(p *savepb.PingState) uint64 {
+	return p.ID
+}
+
+func (a *DBPingState) get_AssociationToken(p *savepb.PingState) string {
+	return p.AssociationToken
+}
+
+func (a *DBPingState) get_Created(p *savepb.PingState) uint32 {
+	return p.Created
+}
+
+func (a *DBPingState) get_ResponseToken(p *savepb.PingState) string {
+	return p.ResponseToken
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -313,7 +333,7 @@ func (a *DBPingState) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".associationtoken, " + a.SQLTablename + ".created, " + a.SQLTablename + ".responsetoken"
 }
 
-func (a *DBPingState) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.PingState, error) {
+func (a *DBPingState) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.PingState, error) {
 	var res []*savepb.PingState
 	for rows.Next() {
 		foo := savepb.PingState{}
@@ -322,6 +342,27 @@ func (a *DBPingState) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBPingState) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.PingState, error) {
+	var res []*savepb.PingState
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.PingState{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.AssociationToken
+		scanTarget_2 := &foo.Created
+		scanTarget_3 := &foo.ResponseToken
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -334,14 +375,15 @@ func (a *DBPingState) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null ,created integer not null ,responsetoken text not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),associationtoken text not null ,created integer not null ,responsetoken text not null );`,
-		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
-		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS created integer not null default 0;`,
-		`ALTER TABLE pingstate ADD COLUMN IF NOT EXISTS responsetoken text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS created integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS responsetoken text not null default '';`,
 
-		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
-		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS created integer not null default 0;`,
-		`ALTER TABLE pingstate_archive ADD COLUMN IF NOT EXISTS responsetoken text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS associationtoken text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS created integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS responsetoken text not null  default '';`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -371,6 +413,4 @@ func (a *DBPingState) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

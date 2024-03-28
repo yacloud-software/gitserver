@@ -616,3 +616,17 @@ func (g *GIT2) FindRepoByURL(ctx context.Context, req *gitpb.ByURLRequest) (*git
 	//	fmt.Printf("Repo \"%s\" - #%d\n", req.URL, res.Repository.ID)
 	return res, nil
 }
+func (g *GIT2) GetNumberCommitsUser(ctx context.Context, req *gitpb.NumberCommitsUserRequest) (*gitpb.NumberCommitsUserResponse, error) {
+	commits, err := db.DefaultDBGitAccessLog().ByUserID(ctx, req.UserID)
+	if err != nil {
+		return nil, err
+	}
+	val := uint32(0)
+	for _, c := range commits {
+		if c.Timestamp < req.Timestamp {
+			continue
+		}
+		val++
+	}
+	return &gitpb.NumberCommitsUserResponse{Commits: val}, nil
+}

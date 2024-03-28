@@ -98,7 +98,7 @@ func (a *DBUserRepositoryAccess) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBUserRepositoryAccess) Save(ctx context.Context, p *savepb.UserRepositoryAccess) (uint64, error) {
 	qn := "DBUserRepositoryAccess_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repoid, userid, read, write) values ($1, $2, $3, $4) returning id", p.RepoID, p.UserID, p.Read, p.Write)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repoid, userid, read, write) values ($1, $2, $3, $4) returning id", a.get_RepoID(p), a.get_UserID(p), a.get_Read(p), a.get_Write(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -124,7 +124,7 @@ func (a *DBUserRepositoryAccess) SaveWithID(ctx context.Context, p *savepb.UserR
 
 func (a *DBUserRepositoryAccess) Update(ctx context.Context, p *savepb.UserRepositoryAccess) error {
 	qn := "DBUserRepositoryAccess_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repoid=$1, userid=$2, read=$3, write=$4 where id = $5", p.RepoID, p.UserID, p.Read, p.Write, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repoid=$1, userid=$2, read=$3, write=$4 where id = $5", a.get_RepoID(p), a.get_UserID(p), a.get_Read(p), a.get_Write(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -318,6 +318,30 @@ func (a *DBUserRepositoryAccess) ByLikeWrite(ctx context.Context, p bool) ([]*sa
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBUserRepositoryAccess) get_ID(p *savepb.UserRepositoryAccess) uint64 {
+	return p.ID
+}
+
+func (a *DBUserRepositoryAccess) get_RepoID(p *savepb.UserRepositoryAccess) uint64 {
+	return p.RepoID
+}
+
+func (a *DBUserRepositoryAccess) get_UserID(p *savepb.UserRepositoryAccess) string {
+	return p.UserID
+}
+
+func (a *DBUserRepositoryAccess) get_Read(p *savepb.UserRepositoryAccess) bool {
+	return p.Read
+}
+
+func (a *DBUserRepositoryAccess) get_Write(p *savepb.UserRepositoryAccess) bool {
+	return p.Write
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -344,7 +368,7 @@ func (a *DBUserRepositoryAccess) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repoid, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".read, " + a.SQLTablename + ".write"
 }
 
-func (a *DBUserRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.UserRepositoryAccess, error) {
+func (a *DBUserRepositoryAccess) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.UserRepositoryAccess, error) {
 	var res []*savepb.UserRepositoryAccess
 	for rows.Next() {
 		foo := savepb.UserRepositoryAccess{}
@@ -353,6 +377,28 @@ func (a *DBUserRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows)
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBUserRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.UserRepositoryAccess, error) {
+	var res []*savepb.UserRepositoryAccess
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.UserRepositoryAccess{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.RepoID
+		scanTarget_2 := &foo.UserID
+		scanTarget_3 := &foo.Read
+		scanTarget_4 := &foo.Write
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -365,16 +411,17 @@ func (a *DBUserRepositoryAccess) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,userid text not null ,read boolean not null ,write boolean not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,userid text not null ,read boolean not null ,write boolean not null );`,
-		`ALTER TABLE userrepositoryaccess ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
-		`ALTER TABLE userrepositoryaccess ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE userrepositoryaccess ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
-		`ALTER TABLE userrepositoryaccess ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
 
-		`ALTER TABLE userrepositoryaccess_archive ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
-		`ALTER TABLE userrepositoryaccess_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE userrepositoryaccess_archive ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
-		`ALTER TABLE userrepositoryaccess_archive ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repoid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS read boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS write boolean not null  default false;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -404,6 +451,4 @@ func (a *DBUserRepositoryAccess) Error(ctx context.Context, q string, e error) e
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

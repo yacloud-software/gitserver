@@ -103,7 +103,7 @@ func (a *DBCreateRepoLog) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBCreateRepoLog) Save(ctx context.Context, p *savepb.CreateRepoLog) (uint64, error) {
 	qn := "DBCreateRepoLog_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id", p.RepositoryID, p.UserID, p.Context, p.Action, p.Success, p.ErrorMessage, p.Started, p.Finished, p.AssociationToken)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id", a.get_RepositoryID(p), a.get_UserID(p), a.get_Context(p), a.get_Action(p), a.get_Success(p), a.get_ErrorMessage(p), a.get_Started(p), a.get_Finished(p), a.get_AssociationToken(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -129,7 +129,7 @@ func (a *DBCreateRepoLog) SaveWithID(ctx context.Context, p *savepb.CreateRepoLo
 
 func (a *DBCreateRepoLog) Update(ctx context.Context, p *savepb.CreateRepoLog) error {
 	qn := "DBCreateRepoLog_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, userid=$2, context=$3, action=$4, success=$5, errormessage=$6, started=$7, finished=$8, associationtoken=$9 where id = $10", p.RepositoryID, p.UserID, p.Context, p.Action, p.Success, p.ErrorMessage, p.Started, p.Finished, p.AssociationToken, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, userid=$2, context=$3, action=$4, success=$5, errormessage=$6, started=$7, finished=$8, associationtoken=$9 where id = $10", a.get_RepositoryID(p), a.get_UserID(p), a.get_Context(p), a.get_Action(p), a.get_Success(p), a.get_ErrorMessage(p), a.get_Started(p), a.get_Finished(p), a.get_AssociationToken(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -473,6 +473,50 @@ func (a *DBCreateRepoLog) ByLikeAssociationToken(ctx context.Context, p string) 
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBCreateRepoLog) get_ID(p *savepb.CreateRepoLog) uint64 {
+	return p.ID
+}
+
+func (a *DBCreateRepoLog) get_RepositoryID(p *savepb.CreateRepoLog) uint64 {
+	return p.RepositoryID
+}
+
+func (a *DBCreateRepoLog) get_UserID(p *savepb.CreateRepoLog) string {
+	return p.UserID
+}
+
+func (a *DBCreateRepoLog) get_Context(p *savepb.CreateRepoLog) string {
+	return p.Context
+}
+
+func (a *DBCreateRepoLog) get_Action(p *savepb.CreateRepoLog) uint32 {
+	return p.Action
+}
+
+func (a *DBCreateRepoLog) get_Success(p *savepb.CreateRepoLog) bool {
+	return p.Success
+}
+
+func (a *DBCreateRepoLog) get_ErrorMessage(p *savepb.CreateRepoLog) string {
+	return p.ErrorMessage
+}
+
+func (a *DBCreateRepoLog) get_Started(p *savepb.CreateRepoLog) uint32 {
+	return p.Started
+}
+
+func (a *DBCreateRepoLog) get_Finished(p *savepb.CreateRepoLog) uint32 {
+	return p.Finished
+}
+
+func (a *DBCreateRepoLog) get_AssociationToken(p *savepb.CreateRepoLog) string {
+	return p.AssociationToken
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -499,7 +543,7 @@ func (a *DBCreateRepoLog) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".context, " + a.SQLTablename + ".action, " + a.SQLTablename + ".success, " + a.SQLTablename + ".errormessage, " + a.SQLTablename + ".started, " + a.SQLTablename + ".finished, " + a.SQLTablename + ".associationtoken"
 }
 
-func (a *DBCreateRepoLog) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.CreateRepoLog, error) {
+func (a *DBCreateRepoLog) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.CreateRepoLog, error) {
 	var res []*savepb.CreateRepoLog
 	for rows.Next() {
 		foo := savepb.CreateRepoLog{}
@@ -508,6 +552,33 @@ func (a *DBCreateRepoLog) FromRows(ctx context.Context, rows *gosql.Rows) ([]*sa
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBCreateRepoLog) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.CreateRepoLog, error) {
+	var res []*savepb.CreateRepoLog
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.CreateRepoLog{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.RepositoryID
+		scanTarget_2 := &foo.UserID
+		scanTarget_3 := &foo.Context
+		scanTarget_4 := &foo.Action
+		scanTarget_5 := &foo.Success
+		scanTarget_6 := &foo.ErrorMessage
+		scanTarget_7 := &foo.Started
+		scanTarget_8 := &foo.Finished
+		scanTarget_9 := &foo.AssociationToken
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4, scanTarget_5, scanTarget_6, scanTarget_7, scanTarget_8, scanTarget_9)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -520,26 +591,27 @@ func (a *DBCreateRepoLog) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,userid text not null ,context text not null ,action integer not null ,success boolean not null ,errormessage text not null ,started integer not null ,finished integer not null ,associationtoken text not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,userid text not null ,context text not null ,action integer not null ,success boolean not null ,errormessage text not null ,started integer not null ,finished integer not null ,associationtoken text not null );`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS context text not null default '';`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS action integer not null default 0;`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS errormessage text not null default '';`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS started integer not null default 0;`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS finished integer not null default 0;`,
-		`ALTER TABLE createrepolog ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS context text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS action integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS errormessage text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS started integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS finished integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
 
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS context text not null default '';`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS action integer not null default 0;`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS errormessage text not null default '';`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS started integer not null default 0;`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS finished integer not null default 0;`,
-		`ALTER TABLE createrepolog_archive ADD COLUMN IF NOT EXISTS associationtoken text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repositoryid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS context text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS action integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS success boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS errormessage text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS started integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS finished integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS associationtoken text not null  default '';`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -569,6 +641,4 @@ func (a *DBCreateRepoLog) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

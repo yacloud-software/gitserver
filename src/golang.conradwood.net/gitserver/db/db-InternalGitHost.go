@@ -96,7 +96,7 @@ func (a *DBInternalGitHost) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBInternalGitHost) Save(ctx context.Context, p *savepb.InternalGitHost) (uint64, error) {
 	qn := "DBInternalGitHost_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (host, expiry) values ($1, $2) returning id", p.Host, p.Expiry)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (host, expiry) values ($1, $2) returning id", a.get_Host(p), a.get_Expiry(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -122,7 +122,7 @@ func (a *DBInternalGitHost) SaveWithID(ctx context.Context, p *savepb.InternalGi
 
 func (a *DBInternalGitHost) Update(ctx context.Context, p *savepb.InternalGitHost) error {
 	qn := "DBInternalGitHost_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set host=$1, expiry=$2 where id = $3", p.Host, p.Expiry, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set host=$1, expiry=$2 where id = $3", a.get_Host(p), a.get_Expiry(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -256,6 +256,22 @@ func (a *DBInternalGitHost) ByLikeExpiry(ctx context.Context, p uint32) ([]*save
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBInternalGitHost) get_ID(p *savepb.InternalGitHost) uint64 {
+	return p.ID
+}
+
+func (a *DBInternalGitHost) get_Host(p *savepb.InternalGitHost) string {
+	return p.Host
+}
+
+func (a *DBInternalGitHost) get_Expiry(p *savepb.InternalGitHost) uint32 {
+	return p.Expiry
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -282,7 +298,7 @@ func (a *DBInternalGitHost) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".host, " + a.SQLTablename + ".expiry"
 }
 
-func (a *DBInternalGitHost) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.InternalGitHost, error) {
+func (a *DBInternalGitHost) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.InternalGitHost, error) {
 	var res []*savepb.InternalGitHost
 	for rows.Next() {
 		foo := savepb.InternalGitHost{}
@@ -291,6 +307,26 @@ func (a *DBInternalGitHost) FromRows(ctx context.Context, rows *gosql.Rows) ([]*
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBInternalGitHost) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.InternalGitHost, error) {
+	var res []*savepb.InternalGitHost
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.InternalGitHost{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.Host
+		scanTarget_2 := &foo.Expiry
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -303,12 +339,13 @@ func (a *DBInternalGitHost) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),host text not null ,expiry integer not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),host text not null ,expiry integer not null );`,
-		`ALTER TABLE internalgithost ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE internalgithost ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS host text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
 
-		`ALTER TABLE internalgithost_archive ADD COLUMN IF NOT EXISTS host text not null default '';`,
-		`ALTER TABLE internalgithost_archive ADD COLUMN IF NOT EXISTS expiry integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS host text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS expiry integer not null  default 0;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -338,6 +375,4 @@ func (a *DBInternalGitHost) Error(ctx context.Context, q string, e error) error 
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

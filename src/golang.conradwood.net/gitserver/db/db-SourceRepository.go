@@ -114,7 +114,7 @@ func (a *DBSourceRepository) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBSourceRepository) Save(ctx context.Context, p *savepb.SourceRepository) (uint64, error) {
 	qn := "DBSourceRepository_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) returning id", p.FilePath, p.ArtefactName, p.RunPostReceive, p.RunPreReceive, p.CreatedComplete, p.Description, p.UserCommits, p.Deleted, p.DeletedTimestamp, p.DeleteUser, p.LastCommit, p.LastCommitUser, p.Tags, p.Forking, p.ForkedFrom, p.BuildRoutingTagName, p.BuildRoutingTagValue, p.ReadOnly, p.CreateUser, p.DenyMessage)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) returning id", a.get_FilePath(p), a.get_ArtefactName(p), a.get_RunPostReceive(p), a.get_RunPreReceive(p), a.get_CreatedComplete(p), a.get_Description(p), a.get_UserCommits(p), a.get_Deleted(p), a.get_DeletedTimestamp(p), a.get_DeleteUser(p), a.get_LastCommit(p), a.get_LastCommitUser(p), a.get_Tags(p), a.get_Forking(p), a.get_ForkedFrom(p), a.get_BuildRoutingTagName(p), a.get_BuildRoutingTagValue(p), a.get_ReadOnly(p), a.get_CreateUser(p), a.get_DenyMessage(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -140,7 +140,7 @@ func (a *DBSourceRepository) SaveWithID(ctx context.Context, p *savepb.SourceRep
 
 func (a *DBSourceRepository) Update(ctx context.Context, p *savepb.SourceRepository) error {
 	qn := "DBSourceRepository_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set filepath=$1, artefactname=$2, runpostreceive=$3, runprereceive=$4, createdcomplete=$5, description=$6, usercommits=$7, deleted=$8, deletedtimestamp=$9, deleteuser=$10, lastcommit=$11, lastcommituser=$12, tags=$13, forking=$14, forkedfrom=$15, buildroutingtagname=$16, buildroutingtagvalue=$17, readonly=$18, createuser=$19, denymessage=$20 where id = $21", p.FilePath, p.ArtefactName, p.RunPostReceive, p.RunPreReceive, p.CreatedComplete, p.Description, p.UserCommits, p.Deleted, p.DeletedTimestamp, p.DeleteUser, p.LastCommit, p.LastCommitUser, p.Tags, p.Forking, p.ForkedFrom, p.BuildRoutingTagName, p.BuildRoutingTagValue, p.ReadOnly, p.CreateUser, p.DenyMessage, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set filepath=$1, artefactname=$2, runpostreceive=$3, runprereceive=$4, createdcomplete=$5, description=$6, usercommits=$7, deleted=$8, deletedtimestamp=$9, deleteuser=$10, lastcommit=$11, lastcommituser=$12, tags=$13, forking=$14, forkedfrom=$15, buildroutingtagname=$16, buildroutingtagvalue=$17, readonly=$18, createuser=$19, denymessage=$20 where id = $21", a.get_FilePath(p), a.get_ArtefactName(p), a.get_RunPostReceive(p), a.get_RunPreReceive(p), a.get_CreatedComplete(p), a.get_Description(p), a.get_UserCommits(p), a.get_Deleted(p), a.get_DeletedTimestamp(p), a.get_DeleteUser(p), a.get_LastCommit(p), a.get_LastCommitUser(p), a.get_Tags(p), a.get_Forking(p), a.get_ForkedFrom(p), a.get_BuildRoutingTagName(p), a.get_BuildRoutingTagValue(p), a.get_ReadOnly(p), a.get_CreateUser(p), a.get_DenyMessage(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -814,6 +814,94 @@ func (a *DBSourceRepository) ByLikeDenyMessage(ctx context.Context, p string) ([
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBSourceRepository) get_ID(p *savepb.SourceRepository) uint64 {
+	return p.ID
+}
+
+func (a *DBSourceRepository) get_FilePath(p *savepb.SourceRepository) string {
+	return p.FilePath
+}
+
+func (a *DBSourceRepository) get_ArtefactName(p *savepb.SourceRepository) string {
+	return p.ArtefactName
+}
+
+func (a *DBSourceRepository) get_RunPostReceive(p *savepb.SourceRepository) bool {
+	return p.RunPostReceive
+}
+
+func (a *DBSourceRepository) get_RunPreReceive(p *savepb.SourceRepository) bool {
+	return p.RunPreReceive
+}
+
+func (a *DBSourceRepository) get_CreatedComplete(p *savepb.SourceRepository) bool {
+	return p.CreatedComplete
+}
+
+func (a *DBSourceRepository) get_Description(p *savepb.SourceRepository) string {
+	return p.Description
+}
+
+func (a *DBSourceRepository) get_UserCommits(p *savepb.SourceRepository) uint64 {
+	return p.UserCommits
+}
+
+func (a *DBSourceRepository) get_Deleted(p *savepb.SourceRepository) bool {
+	return p.Deleted
+}
+
+func (a *DBSourceRepository) get_DeletedTimestamp(p *savepb.SourceRepository) uint32 {
+	return p.DeletedTimestamp
+}
+
+func (a *DBSourceRepository) get_DeleteUser(p *savepb.SourceRepository) string {
+	return p.DeleteUser
+}
+
+func (a *DBSourceRepository) get_LastCommit(p *savepb.SourceRepository) uint32 {
+	return p.LastCommit
+}
+
+func (a *DBSourceRepository) get_LastCommitUser(p *savepb.SourceRepository) string {
+	return p.LastCommitUser
+}
+
+func (a *DBSourceRepository) get_Tags(p *savepb.SourceRepository) uint32 {
+	return p.Tags
+}
+
+func (a *DBSourceRepository) get_Forking(p *savepb.SourceRepository) bool {
+	return p.Forking
+}
+
+func (a *DBSourceRepository) get_ForkedFrom(p *savepb.SourceRepository) uint64 {
+	return p.ForkedFrom
+}
+
+func (a *DBSourceRepository) get_BuildRoutingTagName(p *savepb.SourceRepository) string {
+	return p.BuildRoutingTagName
+}
+
+func (a *DBSourceRepository) get_BuildRoutingTagValue(p *savepb.SourceRepository) string {
+	return p.BuildRoutingTagValue
+}
+
+func (a *DBSourceRepository) get_ReadOnly(p *savepb.SourceRepository) bool {
+	return p.ReadOnly
+}
+
+func (a *DBSourceRepository) get_CreateUser(p *savepb.SourceRepository) string {
+	return p.CreateUser
+}
+
+func (a *DBSourceRepository) get_DenyMessage(p *savepb.SourceRepository) string {
+	return p.DenyMessage
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -840,7 +928,7 @@ func (a *DBSourceRepository) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".filepath, " + a.SQLTablename + ".artefactname, " + a.SQLTablename + ".runpostreceive, " + a.SQLTablename + ".runprereceive, " + a.SQLTablename + ".createdcomplete, " + a.SQLTablename + ".description, " + a.SQLTablename + ".usercommits, " + a.SQLTablename + ".deleted, " + a.SQLTablename + ".deletedtimestamp, " + a.SQLTablename + ".deleteuser, " + a.SQLTablename + ".lastcommit, " + a.SQLTablename + ".lastcommituser, " + a.SQLTablename + ".tags, " + a.SQLTablename + ".forking, " + a.SQLTablename + ".forkedfrom, " + a.SQLTablename + ".buildroutingtagname, " + a.SQLTablename + ".buildroutingtagvalue, " + a.SQLTablename + ".readonly, " + a.SQLTablename + ".createuser, " + a.SQLTablename + ".denymessage"
 }
 
-func (a *DBSourceRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepository, error) {
+func (a *DBSourceRepository) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepository, error) {
 	var res []*savepb.SourceRepository
 	for rows.Next() {
 		foo := savepb.SourceRepository{}
@@ -849,6 +937,44 @@ func (a *DBSourceRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBSourceRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepository, error) {
+	var res []*savepb.SourceRepository
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.SourceRepository{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.FilePath
+		scanTarget_2 := &foo.ArtefactName
+		scanTarget_3 := &foo.RunPostReceive
+		scanTarget_4 := &foo.RunPreReceive
+		scanTarget_5 := &foo.CreatedComplete
+		scanTarget_6 := &foo.Description
+		scanTarget_7 := &foo.UserCommits
+		scanTarget_8 := &foo.Deleted
+		scanTarget_9 := &foo.DeletedTimestamp
+		scanTarget_10 := &foo.DeleteUser
+		scanTarget_11 := &foo.LastCommit
+		scanTarget_12 := &foo.LastCommitUser
+		scanTarget_13 := &foo.Tags
+		scanTarget_14 := &foo.Forking
+		scanTarget_15 := &foo.ForkedFrom
+		scanTarget_16 := &foo.BuildRoutingTagName
+		scanTarget_17 := &foo.BuildRoutingTagValue
+		scanTarget_18 := &foo.ReadOnly
+		scanTarget_19 := &foo.CreateUser
+		scanTarget_20 := &foo.DenyMessage
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4, scanTarget_5, scanTarget_6, scanTarget_7, scanTarget_8, scanTarget_9, scanTarget_10, scanTarget_11, scanTarget_12, scanTarget_13, scanTarget_14, scanTarget_15, scanTarget_16, scanTarget_17, scanTarget_18, scanTarget_19, scanTarget_20)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -861,48 +987,49 @@ func (a *DBSourceRepository) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null ,artefactname text not null ,runpostreceive boolean not null ,runprereceive boolean not null ,createdcomplete boolean not null ,description text not null ,usercommits bigint not null ,deleted boolean not null ,deletedtimestamp integer not null ,deleteuser text not null ,lastcommit integer not null ,lastcommituser text not null ,tags integer not null ,forking boolean not null ,forkedfrom bigint not null ,buildroutingtagname text not null ,buildroutingtagvalue text not null ,readonly boolean not null ,createuser text not null ,denymessage text not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),filepath text not null ,artefactname text not null ,runpostreceive boolean not null ,runprereceive boolean not null ,createdcomplete boolean not null ,description text not null ,usercommits bigint not null ,deleted boolean not null ,deletedtimestamp integer not null ,deleteuser text not null ,lastcommit integer not null ,lastcommituser text not null ,tags integer not null ,forking boolean not null ,forkedfrom bigint not null ,buildroutingtagname text not null ,buildroutingtagvalue text not null ,readonly boolean not null ,createuser text not null ,denymessage text not null );`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS filepath text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS description text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleted boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS deleteuser text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS tags integer not null default 0;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forking boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS readonly boolean not null default false;`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS createuser text not null default '';`,
-		`ALTER TABLE sourcerepository ADD COLUMN IF NOT EXISTS denymessage text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS filepath text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS description text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS deleted boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS deleteuser text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS tags integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS forking boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS readonly boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS createuser text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS denymessage text not null default '';`,
 
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS filepath text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS artefactname text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS runpostreceive boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS runprereceive boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS createdcomplete boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS description text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS usercommits bigint not null default 0;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deleted boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null default 0;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS deleteuser text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS lastcommit integer not null default 0;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS lastcommituser text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS tags integer not null default 0;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS forking boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS forkedfrom bigint not null default 0;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS buildroutingtagname text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS readonly boolean not null default false;`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS createuser text not null default '';`,
-		`ALTER TABLE sourcerepository_archive ADD COLUMN IF NOT EXISTS denymessage text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS filepath text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS artefactname text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS runpostreceive boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS runprereceive boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS createdcomplete boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS description text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS usercommits bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS deleted boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS deletedtimestamp integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS deleteuser text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS lastcommit integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS lastcommituser text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS tags integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS forking boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS forkedfrom bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS buildroutingtagname text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS buildroutingtagvalue text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS readonly boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS createuser text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS denymessage text not null  default '';`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -932,6 +1059,4 @@ func (a *DBSourceRepository) Error(ctx context.Context, q string, e error) error
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

@@ -101,7 +101,7 @@ func (a *DBBuild) Archive(ctx context.Context, id uint64) error {
 // Save (and use database default ID generation)
 func (a *DBBuild) Save(ctx context.Context, p *savepb.Build) (uint64, error) {
 	qn := "DBBuild_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1, $2, $3, $4, $5, $6, $7) returning id", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, commithash, branch, logmessage, userid, r_timestamp, success) values ($1, $2, $3, $4, $5, $6, $7) returning id", a.get_RepositoryID(p), a.get_CommitHash(p), a.get_Branch(p), a.get_LogMessage(p), a.get_UserID(p), a.get_Timestamp(p), a.get_Success(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -127,7 +127,7 @@ func (a *DBBuild) SaveWithID(ctx context.Context, p *savepb.Build) error {
 
 func (a *DBBuild) Update(ctx context.Context, p *savepb.Build) error {
 	qn := "DBBuild_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, commithash=$2, branch=$3, logmessage=$4, userid=$5, r_timestamp=$6, success=$7 where id = $8", p.RepositoryID, p.CommitHash, p.Branch, p.LogMessage, p.UserID, p.Timestamp, p.Success, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, commithash=$2, branch=$3, logmessage=$4, userid=$5, r_timestamp=$6, success=$7 where id = $8", a.get_RepositoryID(p), a.get_CommitHash(p), a.get_Branch(p), a.get_LogMessage(p), a.get_UserID(p), a.get_Timestamp(p), a.get_Success(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -411,6 +411,42 @@ func (a *DBBuild) ByLikeSuccess(ctx context.Context, p bool) ([]*savepb.Build, e
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBBuild) get_ID(p *savepb.Build) uint64 {
+	return p.ID
+}
+
+func (a *DBBuild) get_RepositoryID(p *savepb.Build) uint64 {
+	return p.RepositoryID
+}
+
+func (a *DBBuild) get_CommitHash(p *savepb.Build) string {
+	return p.CommitHash
+}
+
+func (a *DBBuild) get_Branch(p *savepb.Build) string {
+	return p.Branch
+}
+
+func (a *DBBuild) get_LogMessage(p *savepb.Build) string {
+	return p.LogMessage
+}
+
+func (a *DBBuild) get_UserID(p *savepb.Build) string {
+	return p.UserID
+}
+
+func (a *DBBuild) get_Timestamp(p *savepb.Build) uint32 {
+	return p.Timestamp
+}
+
+func (a *DBBuild) get_Success(p *savepb.Build) bool {
+	return p.Success
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -437,7 +473,7 @@ func (a *DBBuild) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".commithash, " + a.SQLTablename + ".branch, " + a.SQLTablename + ".logmessage, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".r_timestamp, " + a.SQLTablename + ".success"
 }
 
-func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Build, error) {
+func (a *DBBuild) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.Build, error) {
 	var res []*savepb.Build
 	for rows.Next() {
 		foo := savepb.Build{}
@@ -446,6 +482,31 @@ func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Bui
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBBuild) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Build, error) {
+	var res []*savepb.Build
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.Build{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.RepositoryID
+		scanTarget_2 := &foo.CommitHash
+		scanTarget_3 := &foo.Branch
+		scanTarget_4 := &foo.LogMessage
+		scanTarget_5 := &foo.UserID
+		scanTarget_6 := &foo.Timestamp
+		scanTarget_7 := &foo.Success
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4, scanTarget_5, scanTarget_6, scanTarget_7)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -458,22 +519,23 @@ func (a *DBBuild) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,commithash text not null ,branch text not null ,logmessage text not null ,userid text not null ,r_timestamp integer not null ,success boolean not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,commithash text not null ,branch text not null ,logmessage text not null ,userid text not null ,r_timestamp integer not null ,success boolean not null );`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS commithash text not null default '';`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS branch text not null default '';`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS logmessage text not null default '';`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;`,
-		`ALTER TABLE build ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS commithash text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS branch text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS logmessage text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
 
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS commithash text not null default '';`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS branch text not null default '';`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS logmessage text not null default '';`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS userid text not null default '';`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS r_timestamp integer not null default 0;`,
-		`ALTER TABLE build_archive ADD COLUMN IF NOT EXISTS success boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repositoryid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS commithash text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS branch text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS logmessage text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS r_timestamp integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS success boolean not null  default false;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -503,6 +565,4 @@ func (a *DBBuild) Error(ctx context.Context, q string, e error) error {
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 

@@ -98,7 +98,7 @@ func (a *DBGroupRepositoryAccess) Archive(ctx context.Context, id uint64) error 
 // Save (and use database default ID generation)
 func (a *DBGroupRepositoryAccess) Save(ctx context.Context, p *savepb.GroupRepositoryAccess) (uint64, error) {
 	qn := "DBGroupRepositoryAccess_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repoid, groupid, read, write) values ($1, $2, $3, $4) returning id", p.RepoID, p.GroupID, p.Read, p.Write)
+	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repoid, groupid, read, write) values ($1, $2, $3, $4) returning id", a.get_RepoID(p), a.get_GroupID(p), a.get_Read(p), a.get_Write(p))
 	if e != nil {
 		return 0, a.Error(ctx, qn, e)
 	}
@@ -124,7 +124,7 @@ func (a *DBGroupRepositoryAccess) SaveWithID(ctx context.Context, p *savepb.Grou
 
 func (a *DBGroupRepositoryAccess) Update(ctx context.Context, p *savepb.GroupRepositoryAccess) error {
 	qn := "DBGroupRepositoryAccess_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repoid=$1, groupid=$2, read=$3, write=$4 where id = $5", p.RepoID, p.GroupID, p.Read, p.Write, p.ID)
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repoid=$1, groupid=$2, read=$3, write=$4 where id = $5", a.get_RepoID(p), a.get_GroupID(p), a.get_Read(p), a.get_Write(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
@@ -318,6 +318,30 @@ func (a *DBGroupRepositoryAccess) ByLikeWrite(ctx context.Context, p bool) ([]*s
 }
 
 /**********************************************************************
+* The field getters
+**********************************************************************/
+
+func (a *DBGroupRepositoryAccess) get_ID(p *savepb.GroupRepositoryAccess) uint64 {
+	return p.ID
+}
+
+func (a *DBGroupRepositoryAccess) get_RepoID(p *savepb.GroupRepositoryAccess) uint64 {
+	return p.RepoID
+}
+
+func (a *DBGroupRepositoryAccess) get_GroupID(p *savepb.GroupRepositoryAccess) string {
+	return p.GroupID
+}
+
+func (a *DBGroupRepositoryAccess) get_Read(p *savepb.GroupRepositoryAccess) bool {
+	return p.Read
+}
+
+func (a *DBGroupRepositoryAccess) get_Write(p *savepb.GroupRepositoryAccess) bool {
+	return p.Write
+}
+
+/**********************************************************************
 * Helper to convert from an SQL Query
 **********************************************************************/
 
@@ -344,7 +368,7 @@ func (a *DBGroupRepositoryAccess) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repoid, " + a.SQLTablename + ".groupid, " + a.SQLTablename + ".read, " + a.SQLTablename + ".write"
 }
 
-func (a *DBGroupRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GroupRepositoryAccess, error) {
+func (a *DBGroupRepositoryAccess) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.GroupRepositoryAccess, error) {
 	var res []*savepb.GroupRepositoryAccess
 	for rows.Next() {
 		foo := savepb.GroupRepositoryAccess{}
@@ -353,6 +377,28 @@ func (a *DBGroupRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows
 			return nil, a.Error(ctx, "fromrow-scan", err)
 		}
 		res = append(res, &foo)
+	}
+	return res, nil
+}
+func (a *DBGroupRepositoryAccess) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GroupRepositoryAccess, error) {
+	var res []*savepb.GroupRepositoryAccess
+	for rows.Next() {
+		// SCANNER:
+		foo := &savepb.GroupRepositoryAccess{}
+		// create the non-nullable pointers
+		// create variables for scan results
+		scanTarget_0 := &foo.ID
+		scanTarget_1 := &foo.RepoID
+		scanTarget_2 := &foo.GroupID
+		scanTarget_3 := &foo.Read
+		scanTarget_4 := &foo.Write
+		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3, scanTarget_4)
+		// END SCANNER
+
+		if err != nil {
+			return nil, a.Error(ctx, "fromrow-scan", err)
+		}
+		res = append(res, foo)
 	}
 	return res, nil
 }
@@ -365,16 +411,17 @@ func (a *DBGroupRepositoryAccess) CreateTable(ctx context.Context) error {
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,groupid text not null ,read boolean not null ,write boolean not null );`,
 		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repoid bigint not null ,groupid text not null ,read boolean not null ,write boolean not null );`,
-		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
-		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS groupid text not null default '';`,
-		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
-		`ALTER TABLE grouprepositoryaccess ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS groupid text not null default '';`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
 
-		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS repoid bigint not null default 0;`,
-		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS groupid text not null default '';`,
-		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS read boolean not null default false;`,
-		`ALTER TABLE grouprepositoryaccess_archive ADD COLUMN IF NOT EXISTS write boolean not null default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repoid bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS groupid text not null  default '';`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS read boolean not null  default false;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS write boolean not null  default false;`,
 	}
+
 	for i, c := range csql {
 		_, e := a.DB.ExecContext(ctx, fmt.Sprintf("create_"+a.SQLTablename+"_%d", i), c)
 		if e != nil {
@@ -404,6 +451,4 @@ func (a *DBGroupRepositoryAccess) Error(ctx context.Context, q string, e error) 
 	}
 	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
-
-
 
