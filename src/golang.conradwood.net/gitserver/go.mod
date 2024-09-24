@@ -2,6 +2,8 @@ module golang.conradwood.net/gitserver
 
 go 1.21.1
 
+toolchain go1.22.2
+
 require (
 	golang.conradwood.net/apis/artefact v1.1.2796
 	golang.conradwood.net/apis/auth v1.1.3123
@@ -11,7 +13,7 @@ require (
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.2796
 	golang.conradwood.net/apis/slackgateway v1.1.2796
-	golang.conradwood.net/go-easyops v0.1.29912
+	golang.conradwood.net/go-easyops v0.1.30265
 	golang.org/x/sys v0.25.0
 	google.golang.org/grpc v1.66.0
 	gopkg.in/yaml.v2 v2.4.0
