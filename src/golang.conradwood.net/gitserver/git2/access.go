@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/apis/objectauth"
 	"golang.conradwood.net/go-easyops/auth"
@@ -124,6 +125,9 @@ func (h *HTTPRequest) hasAccess(ctx context.Context) bool {
 	}
 
 	p := ar.Permissions
+	if p == nil {
+		return false
+	}
 	if h.isWrite() {
 		if p.Write && p.Read && p.View {
 			return true
