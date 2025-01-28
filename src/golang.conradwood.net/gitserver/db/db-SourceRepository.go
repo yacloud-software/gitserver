@@ -2,7 +2,7 @@ package db
 
 /*
  This file was created by mkdb-client.
- The intention is not to modify thils file, but you may extend the struct DBSourceRepository
+ The intention is not to modify this file, but you may extend the struct DBSourceRepository
  in a seperate file (so that you can regenerate this one from time to time)
 */
 
@@ -51,8 +51,10 @@ import (
 	gosql "database/sql"
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/sql"
 	"os"
+	"sync"
 )
 
 var (
@@ -60,9 +62,11 @@ var (
 )
 
 type DBSourceRepository struct {
-	DB                  *sql.DB
-	SQLTablename        string
-	SQLArchivetablename string
+	DB                   *sql.DB
+	SQLTablename         string
+	SQLArchivetablename  string
+	customColumnHandlers []CustomColumnHandler
+	lock                 sync.Mutex
 }
 
 func DefaultDBSourceRepository() *DBSourceRepository {
@@ -91,6 +95,19 @@ func NewDBSourceRepository(db *sql.DB) *DBSourceRepository {
 	return &foo
 }
 
+func (a *DBSourceRepository) GetCustomColumnHandlers() []CustomColumnHandler {
+	return a.customColumnHandlers
+}
+func (a *DBSourceRepository) AddCustomColumnHandler(w CustomColumnHandler) {
+	a.lock.Lock()
+	a.customColumnHandlers = append(a.customColumnHandlers, w)
+	a.lock.Unlock()
+}
+
+func (a *DBSourceRepository) NewQuery() *Query {
+	return newQuery(a)
+}
+
 // archive. It is NOT transactionally save.
 func (a *DBSourceRepository) Archive(ctx context.Context, id uint64) error {
 
@@ -111,31 +128,98 @@ func (a *DBSourceRepository) Archive(ctx context.Context, id uint64) error {
 	return nil
 }
 
-// Save (and use database default ID generation)
+// return a map with columnname -> value_from_proto
+func (a *DBSourceRepository) buildSaveMap(ctx context.Context, p *savepb.SourceRepository) (map[string]interface{}, error) {
+	extra, err := extraFieldsToStore(ctx, a, p)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]interface{})
+	res["id"] = a.get_col_from_proto(p, "id")
+	res["filepath"] = a.get_col_from_proto(p, "filepath")
+	res["artefactname"] = a.get_col_from_proto(p, "artefactname")
+	res["runpostreceive"] = a.get_col_from_proto(p, "runpostreceive")
+	res["runprereceive"] = a.get_col_from_proto(p, "runprereceive")
+	res["createdcomplete"] = a.get_col_from_proto(p, "createdcomplete")
+	res["description"] = a.get_col_from_proto(p, "description")
+	res["usercommits"] = a.get_col_from_proto(p, "usercommits")
+	res["deleted"] = a.get_col_from_proto(p, "deleted")
+	res["deletedtimestamp"] = a.get_col_from_proto(p, "deletedtimestamp")
+	res["deleteuser"] = a.get_col_from_proto(p, "deleteuser")
+	res["lastcommit"] = a.get_col_from_proto(p, "lastcommit")
+	res["lastcommituser"] = a.get_col_from_proto(p, "lastcommituser")
+	res["tags"] = a.get_col_from_proto(p, "tags")
+	res["forking"] = a.get_col_from_proto(p, "forking")
+	res["forkedfrom"] = a.get_col_from_proto(p, "forkedfrom")
+	res["buildroutingtagname"] = a.get_col_from_proto(p, "buildroutingtagname")
+	res["buildroutingtagvalue"] = a.get_col_from_proto(p, "buildroutingtagvalue")
+	res["readonly"] = a.get_col_from_proto(p, "readonly")
+	res["createuser"] = a.get_col_from_proto(p, "createuser")
+	res["denymessage"] = a.get_col_from_proto(p, "denymessage")
+	if extra != nil {
+		for k, v := range extra {
+			res[k] = v
+		}
+	}
+	return res, nil
+}
+
 func (a *DBSourceRepository) Save(ctx context.Context, p *savepb.SourceRepository) (uint64, error) {
-	qn := "DBSourceRepository_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) returning id", a.get_FilePath(p), a.get_ArtefactName(p), a.get_RunPostReceive(p), a.get_RunPreReceive(p), a.get_CreatedComplete(p), a.get_Description(p), a.get_UserCommits(p), a.get_Deleted(p), a.get_DeletedTimestamp(p), a.get_DeleteUser(p), a.get_LastCommit(p), a.get_LastCommitUser(p), a.get_Tags(p), a.get_Forking(p), a.get_ForkedFrom(p), a.get_BuildRoutingTagName(p), a.get_BuildRoutingTagValue(p), a.get_ReadOnly(p), a.get_CreateUser(p), a.get_DenyMessage(p))
-	if e != nil {
-		return 0, a.Error(ctx, qn, e)
+	qn := "save_DBSourceRepository"
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return 0, err
 	}
-	defer rows.Close()
-	if !rows.Next() {
-		return 0, a.Error(ctx, qn, fmt.Errorf("No rows after insert"))
-	}
-	var id uint64
-	e = rows.Scan(&id)
-	if e != nil {
-		return 0, a.Error(ctx, qn, fmt.Errorf("failed to scan id after insert: %s", e))
-	}
-	p.ID = id
-	return id, nil
+	delete(smap, "id") // save without id
+	return a.saveMap(ctx, qn, smap, p)
 }
 
 // Save using the ID specified
 func (a *DBSourceRepository) SaveWithID(ctx context.Context, p *savepb.SourceRepository) error {
 	qn := "insert_DBSourceRepository"
-	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage) values ($1,$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21) ", p.ID, p.FilePath, p.ArtefactName, p.RunPostReceive, p.RunPreReceive, p.CreatedComplete, p.Description, p.UserCommits, p.Deleted, p.DeletedTimestamp, p.DeleteUser, p.LastCommit, p.LastCommitUser, p.Tags, p.Forking, p.ForkedFrom, p.BuildRoutingTagName, p.BuildRoutingTagValue, p.ReadOnly, p.CreateUser, p.DenyMessage)
-	return a.Error(ctx, qn, e)
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return err
+	}
+	_, err = a.saveMap(ctx, qn, smap, p)
+	return err
+}
+
+// use a hashmap of columnname->values to store to database (see buildSaveMap())
+func (a *DBSourceRepository) saveMap(ctx context.Context, queryname string, smap map[string]interface{}, p *savepb.SourceRepository) (uint64, error) {
+	// Save (and use database default ID generation)
+
+	var rows *gosql.Rows
+	var e error
+
+	q_cols := ""
+	q_valnames := ""
+	q_vals := make([]interface{}, 0)
+	deli := ""
+	i := 0
+	// build the 2 parts of the query (column names and value names) as well as the values themselves
+	for colname, val := range smap {
+		q_cols = q_cols + deli + colname
+		i++
+		q_valnames = q_valnames + deli + fmt.Sprintf("$%d", i)
+		q_vals = append(q_vals, val)
+		deli = ","
+	}
+	rows, e = a.DB.QueryContext(ctx, queryname, "insert into "+a.SQLTablename+" ("+q_cols+") values ("+q_valnames+") returning id", q_vals...)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, e)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, a.Error(ctx, queryname, errors.Errorf("No rows after insert"))
+	}
+	var id uint64
+	e = rows.Scan(&id)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, errors.Errorf("failed to scan id after insert: %s", e))
+	}
+	p.ID = id
+	return id, nil
 }
 
 func (a *DBSourceRepository) Update(ctx context.Context, p *savepb.SourceRepository) error {
@@ -155,20 +239,15 @@ func (a *DBSourceRepository) DeleteByID(ctx context.Context, p uint64) error {
 // get it by primary id
 func (a *DBSourceRepository) ByID(ctx context.Context, p uint64) (*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No SourceRepository with id %v", p))
+		return nil, a.Error(ctx, qn, errors.Errorf("No SourceRepository with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) SourceRepository with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) SourceRepository with id %v", len(l), p))
 	}
 	return l[0], nil
 }
@@ -176,35 +255,35 @@ func (a *DBSourceRepository) ByID(ctx context.Context, p uint64) (*savepb.Source
 // get it by primary id (nil if no such ID row, but no error either)
 func (a *DBSourceRepository) TryByID(ctx context.Context, p uint64) (*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_TryByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
 		return nil, nil
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) SourceRepository with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) SourceRepository with id %v", len(l), p))
 	}
 	return l[0], nil
+}
+
+// get it by multiple primary ids
+func (a *DBSourceRepository) ByIDs(ctx context.Context, p []uint64) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByIDs"
+	l, e := a.fromQuery(ctx, qn, "id in $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
+	}
+	return l, nil
 }
 
 // get all rows
 func (a *DBSourceRepository) All(ctx context.Context) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_all"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" order by id")
+	l, e := a.fromQuery(ctx, qn, "true")
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("All: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, fmt.Errorf("All: error scanning (%s)", e)
+		return nil, errors.Errorf("All: error scanning (%s)", e)
 	}
 	return l, nil
 }
@@ -216,14 +295,19 @@ func (a *DBSourceRepository) All(ctx context.Context) ([]*savepb.SourceRepositor
 // get all "DBSourceRepository" rows with matching FilePath
 func (a *DBSourceRepository) ByFilePath(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByFilePath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where filepath = $1", p)
+	l, e := a.fromQuery(ctx, qn, "filepath = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFilePath: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFilePath: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching FilePath
+func (a *DBSourceRepository) ByMultiFilePath(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByFilePath"
+	l, e := a.fromQuery(ctx, qn, "filepath in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFilePath: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFilePath: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -231,14 +315,9 @@ func (a *DBSourceRepository) ByFilePath(ctx context.Context, p string) ([]*savep
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeFilePath(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeFilePath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where filepath ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "filepath ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFilePath: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFilePath: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFilePath: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -246,14 +325,19 @@ func (a *DBSourceRepository) ByLikeFilePath(ctx context.Context, p string) ([]*s
 // get all "DBSourceRepository" rows with matching ArtefactName
 func (a *DBSourceRepository) ByArtefactName(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByArtefactName"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where artefactname = $1", p)
+	l, e := a.fromQuery(ctx, qn, "artefactname = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByArtefactName: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByArtefactName: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching ArtefactName
+func (a *DBSourceRepository) ByMultiArtefactName(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByArtefactName"
+	l, e := a.fromQuery(ctx, qn, "artefactname in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByArtefactName: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByArtefactName: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -261,14 +345,9 @@ func (a *DBSourceRepository) ByArtefactName(ctx context.Context, p string) ([]*s
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeArtefactName(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeArtefactName"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where artefactname ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "artefactname ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByArtefactName: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByArtefactName: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByArtefactName: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -276,14 +355,19 @@ func (a *DBSourceRepository) ByLikeArtefactName(ctx context.Context, p string) (
 // get all "DBSourceRepository" rows with matching RunPostReceive
 func (a *DBSourceRepository) ByRunPostReceive(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByRunPostReceive"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where runpostreceive = $1", p)
+	l, e := a.fromQuery(ctx, qn, "runpostreceive = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPostReceive: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPostReceive: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching RunPostReceive
+func (a *DBSourceRepository) ByMultiRunPostReceive(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByRunPostReceive"
+	l, e := a.fromQuery(ctx, qn, "runpostreceive in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPostReceive: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPostReceive: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -291,14 +375,9 @@ func (a *DBSourceRepository) ByRunPostReceive(ctx context.Context, p bool) ([]*s
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeRunPostReceive(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeRunPostReceive"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where runpostreceive ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "runpostreceive ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPostReceive: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPostReceive: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPostReceive: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -306,14 +385,19 @@ func (a *DBSourceRepository) ByLikeRunPostReceive(ctx context.Context, p bool) (
 // get all "DBSourceRepository" rows with matching RunPreReceive
 func (a *DBSourceRepository) ByRunPreReceive(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByRunPreReceive"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where runprereceive = $1", p)
+	l, e := a.fromQuery(ctx, qn, "runprereceive = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPreReceive: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPreReceive: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching RunPreReceive
+func (a *DBSourceRepository) ByMultiRunPreReceive(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByRunPreReceive"
+	l, e := a.fromQuery(ctx, qn, "runprereceive in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPreReceive: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPreReceive: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -321,14 +405,9 @@ func (a *DBSourceRepository) ByRunPreReceive(ctx context.Context, p bool) ([]*sa
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeRunPreReceive(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeRunPreReceive"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where runprereceive ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "runprereceive ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPreReceive: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRunPreReceive: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRunPreReceive: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -336,14 +415,19 @@ func (a *DBSourceRepository) ByLikeRunPreReceive(ctx context.Context, p bool) ([
 // get all "DBSourceRepository" rows with matching CreatedComplete
 func (a *DBSourceRepository) ByCreatedComplete(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByCreatedComplete"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where createdcomplete = $1", p)
+	l, e := a.fromQuery(ctx, qn, "createdcomplete = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreatedComplete: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreatedComplete: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching CreatedComplete
+func (a *DBSourceRepository) ByMultiCreatedComplete(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByCreatedComplete"
+	l, e := a.fromQuery(ctx, qn, "createdcomplete in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreatedComplete: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreatedComplete: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -351,14 +435,9 @@ func (a *DBSourceRepository) ByCreatedComplete(ctx context.Context, p bool) ([]*
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeCreatedComplete(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeCreatedComplete"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where createdcomplete ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "createdcomplete ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreatedComplete: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreatedComplete: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreatedComplete: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -366,14 +445,19 @@ func (a *DBSourceRepository) ByLikeCreatedComplete(ctx context.Context, p bool) 
 // get all "DBSourceRepository" rows with matching Description
 func (a *DBSourceRepository) ByDescription(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByDescription"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where description = $1", p)
+	l, e := a.fromQuery(ctx, qn, "description = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDescription: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDescription: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching Description
+func (a *DBSourceRepository) ByMultiDescription(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByDescription"
+	l, e := a.fromQuery(ctx, qn, "description in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDescription: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDescription: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -381,14 +465,9 @@ func (a *DBSourceRepository) ByDescription(ctx context.Context, p string) ([]*sa
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeDescription(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeDescription"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where description ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "description ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDescription: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDescription: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDescription: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -396,14 +475,19 @@ func (a *DBSourceRepository) ByLikeDescription(ctx context.Context, p string) ([
 // get all "DBSourceRepository" rows with matching UserCommits
 func (a *DBSourceRepository) ByUserCommits(ctx context.Context, p uint64) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByUserCommits"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where usercommits = $1", p)
+	l, e := a.fromQuery(ctx, qn, "usercommits = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserCommits: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserCommits: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching UserCommits
+func (a *DBSourceRepository) ByMultiUserCommits(ctx context.Context, p []uint64) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByUserCommits"
+	l, e := a.fromQuery(ctx, qn, "usercommits in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserCommits: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserCommits: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -411,14 +495,9 @@ func (a *DBSourceRepository) ByUserCommits(ctx context.Context, p uint64) ([]*sa
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeUserCommits(ctx context.Context, p uint64) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeUserCommits"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where usercommits ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "usercommits ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserCommits: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserCommits: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserCommits: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -426,14 +505,19 @@ func (a *DBSourceRepository) ByLikeUserCommits(ctx context.Context, p uint64) ([
 // get all "DBSourceRepository" rows with matching Deleted
 func (a *DBSourceRepository) ByDeleted(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByDeleted"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deleted = $1", p)
+	l, e := a.fromQuery(ctx, qn, "deleted = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleted: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleted: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching Deleted
+func (a *DBSourceRepository) ByMultiDeleted(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByDeleted"
+	l, e := a.fromQuery(ctx, qn, "deleted in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleted: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleted: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -441,14 +525,9 @@ func (a *DBSourceRepository) ByDeleted(ctx context.Context, p bool) ([]*savepb.S
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeDeleted(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeDeleted"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deleted ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "deleted ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleted: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleted: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleted: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -456,14 +535,19 @@ func (a *DBSourceRepository) ByLikeDeleted(ctx context.Context, p bool) ([]*save
 // get all "DBSourceRepository" rows with matching DeletedTimestamp
 func (a *DBSourceRepository) ByDeletedTimestamp(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByDeletedTimestamp"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deletedtimestamp = $1", p)
+	l, e := a.fromQuery(ctx, qn, "deletedtimestamp = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeletedTimestamp: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeletedTimestamp: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching DeletedTimestamp
+func (a *DBSourceRepository) ByMultiDeletedTimestamp(ctx context.Context, p []uint32) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByDeletedTimestamp"
+	l, e := a.fromQuery(ctx, qn, "deletedtimestamp in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeletedTimestamp: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeletedTimestamp: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -471,14 +555,9 @@ func (a *DBSourceRepository) ByDeletedTimestamp(ctx context.Context, p uint32) (
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeDeletedTimestamp(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeDeletedTimestamp"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deletedtimestamp ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "deletedtimestamp ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeletedTimestamp: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeletedTimestamp: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeletedTimestamp: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -486,14 +565,19 @@ func (a *DBSourceRepository) ByLikeDeletedTimestamp(ctx context.Context, p uint3
 // get all "DBSourceRepository" rows with matching DeleteUser
 func (a *DBSourceRepository) ByDeleteUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByDeleteUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deleteuser = $1", p)
+	l, e := a.fromQuery(ctx, qn, "deleteuser = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleteUser: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleteUser: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching DeleteUser
+func (a *DBSourceRepository) ByMultiDeleteUser(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByDeleteUser"
+	l, e := a.fromQuery(ctx, qn, "deleteuser in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleteUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleteUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -501,14 +585,9 @@ func (a *DBSourceRepository) ByDeleteUser(ctx context.Context, p string) ([]*sav
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeDeleteUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeDeleteUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where deleteuser ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "deleteuser ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleteUser: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDeleteUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDeleteUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -516,14 +595,19 @@ func (a *DBSourceRepository) ByLikeDeleteUser(ctx context.Context, p string) ([]
 // get all "DBSourceRepository" rows with matching LastCommit
 func (a *DBSourceRepository) ByLastCommit(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLastCommit"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where lastcommit = $1", p)
+	l, e := a.fromQuery(ctx, qn, "lastcommit = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommit: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommit: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching LastCommit
+func (a *DBSourceRepository) ByMultiLastCommit(ctx context.Context, p []uint32) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByLastCommit"
+	l, e := a.fromQuery(ctx, qn, "lastcommit in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommit: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommit: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -531,14 +615,9 @@ func (a *DBSourceRepository) ByLastCommit(ctx context.Context, p uint32) ([]*sav
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeLastCommit(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeLastCommit"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where lastcommit ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "lastcommit ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommit: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommit: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommit: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -546,14 +625,19 @@ func (a *DBSourceRepository) ByLikeLastCommit(ctx context.Context, p uint32) ([]
 // get all "DBSourceRepository" rows with matching LastCommitUser
 func (a *DBSourceRepository) ByLastCommitUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLastCommitUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where lastcommituser = $1", p)
+	l, e := a.fromQuery(ctx, qn, "lastcommituser = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommitUser: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommitUser: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching LastCommitUser
+func (a *DBSourceRepository) ByMultiLastCommitUser(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByLastCommitUser"
+	l, e := a.fromQuery(ctx, qn, "lastcommituser in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommitUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommitUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -561,14 +645,9 @@ func (a *DBSourceRepository) ByLastCommitUser(ctx context.Context, p string) ([]
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeLastCommitUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeLastCommitUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where lastcommituser ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "lastcommituser ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommitUser: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByLastCommitUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByLastCommitUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -576,14 +655,19 @@ func (a *DBSourceRepository) ByLikeLastCommitUser(ctx context.Context, p string)
 // get all "DBSourceRepository" rows with matching Tags
 func (a *DBSourceRepository) ByTags(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByTags"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where tags = $1", p)
+	l, e := a.fromQuery(ctx, qn, "tags = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByTags: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTags: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching Tags
+func (a *DBSourceRepository) ByMultiTags(ctx context.Context, p []uint32) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByTags"
+	l, e := a.fromQuery(ctx, qn, "tags in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByTags: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTags: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -591,14 +675,9 @@ func (a *DBSourceRepository) ByTags(ctx context.Context, p uint32) ([]*savepb.So
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeTags(ctx context.Context, p uint32) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeTags"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where tags ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "tags ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByTags: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByTags: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTags: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -606,14 +685,19 @@ func (a *DBSourceRepository) ByLikeTags(ctx context.Context, p uint32) ([]*savep
 // get all "DBSourceRepository" rows with matching Forking
 func (a *DBSourceRepository) ByForking(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByForking"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where forking = $1", p)
+	l, e := a.fromQuery(ctx, qn, "forking = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForking: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForking: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching Forking
+func (a *DBSourceRepository) ByMultiForking(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByForking"
+	l, e := a.fromQuery(ctx, qn, "forking in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForking: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForking: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -621,14 +705,9 @@ func (a *DBSourceRepository) ByForking(ctx context.Context, p bool) ([]*savepb.S
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeForking(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeForking"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where forking ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "forking ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForking: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForking: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForking: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -636,14 +715,19 @@ func (a *DBSourceRepository) ByLikeForking(ctx context.Context, p bool) ([]*save
 // get all "DBSourceRepository" rows with matching ForkedFrom
 func (a *DBSourceRepository) ByForkedFrom(ctx context.Context, p uint64) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByForkedFrom"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where forkedfrom = $1", p)
+	l, e := a.fromQuery(ctx, qn, "forkedfrom = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForkedFrom: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForkedFrom: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching ForkedFrom
+func (a *DBSourceRepository) ByMultiForkedFrom(ctx context.Context, p []uint64) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByForkedFrom"
+	l, e := a.fromQuery(ctx, qn, "forkedfrom in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForkedFrom: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForkedFrom: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -651,14 +735,9 @@ func (a *DBSourceRepository) ByForkedFrom(ctx context.Context, p uint64) ([]*sav
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeForkedFrom(ctx context.Context, p uint64) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeForkedFrom"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where forkedfrom ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "forkedfrom ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForkedFrom: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByForkedFrom: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByForkedFrom: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -666,14 +745,19 @@ func (a *DBSourceRepository) ByLikeForkedFrom(ctx context.Context, p uint64) ([]
 // get all "DBSourceRepository" rows with matching BuildRoutingTagName
 func (a *DBSourceRepository) ByBuildRoutingTagName(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByBuildRoutingTagName"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where buildroutingtagname = $1", p)
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagname = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagName: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagName: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching BuildRoutingTagName
+func (a *DBSourceRepository) ByMultiBuildRoutingTagName(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByBuildRoutingTagName"
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagname in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagName: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagName: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -681,14 +765,9 @@ func (a *DBSourceRepository) ByBuildRoutingTagName(ctx context.Context, p string
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeBuildRoutingTagName(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeBuildRoutingTagName"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where buildroutingtagname ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagname ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagName: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagName: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagName: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -696,14 +775,19 @@ func (a *DBSourceRepository) ByLikeBuildRoutingTagName(ctx context.Context, p st
 // get all "DBSourceRepository" rows with matching BuildRoutingTagValue
 func (a *DBSourceRepository) ByBuildRoutingTagValue(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByBuildRoutingTagValue"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where buildroutingtagvalue = $1", p)
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagvalue = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagValue: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagValue: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching BuildRoutingTagValue
+func (a *DBSourceRepository) ByMultiBuildRoutingTagValue(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByBuildRoutingTagValue"
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagvalue in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagValue: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagValue: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -711,14 +795,9 @@ func (a *DBSourceRepository) ByBuildRoutingTagValue(ctx context.Context, p strin
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeBuildRoutingTagValue(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeBuildRoutingTagValue"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where buildroutingtagvalue ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "buildroutingtagvalue ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagValue: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByBuildRoutingTagValue: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildRoutingTagValue: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -726,14 +805,19 @@ func (a *DBSourceRepository) ByLikeBuildRoutingTagValue(ctx context.Context, p s
 // get all "DBSourceRepository" rows with matching ReadOnly
 func (a *DBSourceRepository) ByReadOnly(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByReadOnly"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where readonly = $1", p)
+	l, e := a.fromQuery(ctx, qn, "readonly = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByReadOnly: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByReadOnly: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching ReadOnly
+func (a *DBSourceRepository) ByMultiReadOnly(ctx context.Context, p []bool) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByReadOnly"
+	l, e := a.fromQuery(ctx, qn, "readonly in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByReadOnly: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByReadOnly: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -741,14 +825,9 @@ func (a *DBSourceRepository) ByReadOnly(ctx context.Context, p bool) ([]*savepb.
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeReadOnly(ctx context.Context, p bool) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeReadOnly"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where readonly ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "readonly ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByReadOnly: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByReadOnly: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByReadOnly: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -756,14 +835,19 @@ func (a *DBSourceRepository) ByLikeReadOnly(ctx context.Context, p bool) ([]*sav
 // get all "DBSourceRepository" rows with matching CreateUser
 func (a *DBSourceRepository) ByCreateUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByCreateUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where createuser = $1", p)
+	l, e := a.fromQuery(ctx, qn, "createuser = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreateUser: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreateUser: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching CreateUser
+func (a *DBSourceRepository) ByMultiCreateUser(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByCreateUser"
+	l, e := a.fromQuery(ctx, qn, "createuser in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreateUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreateUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -771,14 +855,9 @@ func (a *DBSourceRepository) ByCreateUser(ctx context.Context, p string) ([]*sav
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeCreateUser(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeCreateUser"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where createuser ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "createuser ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreateUser: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByCreateUser: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByCreateUser: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -786,14 +865,19 @@ func (a *DBSourceRepository) ByLikeCreateUser(ctx context.Context, p string) ([]
 // get all "DBSourceRepository" rows with matching DenyMessage
 func (a *DBSourceRepository) ByDenyMessage(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByDenyMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where denymessage = $1", p)
+	l, e := a.fromQuery(ctx, qn, "denymessage = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDenyMessage: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDenyMessage: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBSourceRepository" rows with multiple matching DenyMessage
+func (a *DBSourceRepository) ByMultiDenyMessage(ctx context.Context, p []string) ([]*savepb.SourceRepository, error) {
+	qn := "DBSourceRepository_ByDenyMessage"
+	l, e := a.fromQuery(ctx, qn, "denymessage in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDenyMessage: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDenyMessage: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -801,14 +885,9 @@ func (a *DBSourceRepository) ByDenyMessage(ctx context.Context, p string) ([]*sa
 // the 'like' lookup
 func (a *DBSourceRepository) ByLikeDenyMessage(ctx context.Context, p string) ([]*savepb.SourceRepository, error) {
 	qn := "DBSourceRepository_ByLikeDenyMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,filepath, artefactname, runpostreceive, runprereceive, createdcomplete, description, usercommits, deleted, deletedtimestamp, deleteuser, lastcommit, lastcommituser, tags, forking, forkedfrom, buildroutingtagname, buildroutingtagvalue, readonly, createuser, denymessage from "+a.SQLTablename+" where denymessage ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "denymessage ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDenyMessage: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByDenyMessage: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByDenyMessage: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -817,88 +896,109 @@ func (a *DBSourceRepository) ByLikeDenyMessage(ctx context.Context, p string) ([
 * The field getters
 **********************************************************************/
 
+// getter for field "ID" (ID) [uint64]
 func (a *DBSourceRepository) get_ID(p *savepb.SourceRepository) uint64 {
-	return p.ID
+	return uint64(p.ID)
 }
 
+// getter for field "FilePath" (FilePath) [string]
 func (a *DBSourceRepository) get_FilePath(p *savepb.SourceRepository) string {
-	return p.FilePath
+	return string(p.FilePath)
 }
 
+// getter for field "ArtefactName" (ArtefactName) [string]
 func (a *DBSourceRepository) get_ArtefactName(p *savepb.SourceRepository) string {
-	return p.ArtefactName
+	return string(p.ArtefactName)
 }
 
+// getter for field "RunPostReceive" (RunPostReceive) [bool]
 func (a *DBSourceRepository) get_RunPostReceive(p *savepb.SourceRepository) bool {
-	return p.RunPostReceive
+	return bool(p.RunPostReceive)
 }
 
+// getter for field "RunPreReceive" (RunPreReceive) [bool]
 func (a *DBSourceRepository) get_RunPreReceive(p *savepb.SourceRepository) bool {
-	return p.RunPreReceive
+	return bool(p.RunPreReceive)
 }
 
+// getter for field "CreatedComplete" (CreatedComplete) [bool]
 func (a *DBSourceRepository) get_CreatedComplete(p *savepb.SourceRepository) bool {
-	return p.CreatedComplete
+	return bool(p.CreatedComplete)
 }
 
+// getter for field "Description" (Description) [string]
 func (a *DBSourceRepository) get_Description(p *savepb.SourceRepository) string {
-	return p.Description
+	return string(p.Description)
 }
 
+// getter for field "UserCommits" (UserCommits) [uint64]
 func (a *DBSourceRepository) get_UserCommits(p *savepb.SourceRepository) uint64 {
-	return p.UserCommits
+	return uint64(p.UserCommits)
 }
 
+// getter for field "Deleted" (Deleted) [bool]
 func (a *DBSourceRepository) get_Deleted(p *savepb.SourceRepository) bool {
-	return p.Deleted
+	return bool(p.Deleted)
 }
 
+// getter for field "DeletedTimestamp" (DeletedTimestamp) [uint32]
 func (a *DBSourceRepository) get_DeletedTimestamp(p *savepb.SourceRepository) uint32 {
-	return p.DeletedTimestamp
+	return uint32(p.DeletedTimestamp)
 }
 
+// getter for field "DeleteUser" (DeleteUser) [string]
 func (a *DBSourceRepository) get_DeleteUser(p *savepb.SourceRepository) string {
-	return p.DeleteUser
+	return string(p.DeleteUser)
 }
 
+// getter for field "LastCommit" (LastCommit) [uint32]
 func (a *DBSourceRepository) get_LastCommit(p *savepb.SourceRepository) uint32 {
-	return p.LastCommit
+	return uint32(p.LastCommit)
 }
 
+// getter for field "LastCommitUser" (LastCommitUser) [string]
 func (a *DBSourceRepository) get_LastCommitUser(p *savepb.SourceRepository) string {
-	return p.LastCommitUser
+	return string(p.LastCommitUser)
 }
 
+// getter for field "Tags" (Tags) [uint32]
 func (a *DBSourceRepository) get_Tags(p *savepb.SourceRepository) uint32 {
-	return p.Tags
+	return uint32(p.Tags)
 }
 
+// getter for field "Forking" (Forking) [bool]
 func (a *DBSourceRepository) get_Forking(p *savepb.SourceRepository) bool {
-	return p.Forking
+	return bool(p.Forking)
 }
 
+// getter for field "ForkedFrom" (ForkedFrom) [uint64]
 func (a *DBSourceRepository) get_ForkedFrom(p *savepb.SourceRepository) uint64 {
-	return p.ForkedFrom
+	return uint64(p.ForkedFrom)
 }
 
+// getter for field "BuildRoutingTagName" (BuildRoutingTagName) [string]
 func (a *DBSourceRepository) get_BuildRoutingTagName(p *savepb.SourceRepository) string {
-	return p.BuildRoutingTagName
+	return string(p.BuildRoutingTagName)
 }
 
+// getter for field "BuildRoutingTagValue" (BuildRoutingTagValue) [string]
 func (a *DBSourceRepository) get_BuildRoutingTagValue(p *savepb.SourceRepository) string {
-	return p.BuildRoutingTagValue
+	return string(p.BuildRoutingTagValue)
 }
 
+// getter for field "ReadOnly" (ReadOnly) [bool]
 func (a *DBSourceRepository) get_ReadOnly(p *savepb.SourceRepository) bool {
-	return p.ReadOnly
+	return bool(p.ReadOnly)
 }
 
+// getter for field "CreateUser" (CreateUser) [string]
 func (a *DBSourceRepository) get_CreateUser(p *savepb.SourceRepository) string {
-	return p.CreateUser
+	return string(p.CreateUser)
 }
 
+// getter for field "DenyMessage" (DenyMessage) [string]
 func (a *DBSourceRepository) get_DenyMessage(p *savepb.SourceRepository) string {
-	return p.DenyMessage
+	return string(p.DenyMessage)
 }
 
 /**********************************************************************
@@ -906,17 +1006,119 @@ func (a *DBSourceRepository) get_DenyMessage(p *savepb.SourceRepository) string 
 **********************************************************************/
 
 // from a query snippet (the part after WHERE)
-func (a *DBSourceRepository) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.SourceRepository, error) {
-	rows, err := a.DB.QueryContext(ctx, "custom_query_"+a.Tablename(), "select "+a.SelectCols()+" from "+a.Tablename()+" where "+query_where, args...)
+func (a *DBSourceRepository) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.SourceRepository, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
 	if err != nil {
 		return nil, err
 	}
-	return a.FromRows(ctx, rows)
+	i := 0
+	for col_name, value := range extra_fields {
+		i++
+		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
+		query.Add(col_name+" = "+efname, QP{efname: value})
+	}
+
+	gw, paras := query.ToPostgres()
+	queryname := "custom_dbquery"
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where "+gw, paras...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+
+}
+
+func (a *DBSourceRepository) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.SourceRepository, error) {
+	return a.fromQuery(ctx, "custom_query_"+a.Tablename(), query_where, args...)
+}
+
+// from a query snippet (the part after WHERE)
+func (a *DBSourceRepository) fromQuery(ctx context.Context, queryname string, query_where string, args ...interface{}) ([]*savepb.SourceRepository, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	eq := ""
+	if extra_fields != nil && len(extra_fields) > 0 {
+		eq = " AND ("
+		// build the extraquery "eq"
+		i := len(args)
+		deli := ""
+		for col_name, value := range extra_fields {
+			i++
+			eq = eq + deli + col_name + fmt.Sprintf(" = $%d", i)
+			deli = " AND "
+			args = append(args, value)
+		}
+		eq = eq + ")"
+	}
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where ( "+query_where+") "+eq, args...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 /**********************************************************************
 * Helper to convert from an SQL Row to struct
 **********************************************************************/
+func (a *DBSourceRepository) get_col_from_proto(p *savepb.SourceRepository, colname string) interface{} {
+	if colname == "id" {
+		return a.get_ID(p)
+	} else if colname == "filepath" {
+		return a.get_FilePath(p)
+	} else if colname == "artefactname" {
+		return a.get_ArtefactName(p)
+	} else if colname == "runpostreceive" {
+		return a.get_RunPostReceive(p)
+	} else if colname == "runprereceive" {
+		return a.get_RunPreReceive(p)
+	} else if colname == "createdcomplete" {
+		return a.get_CreatedComplete(p)
+	} else if colname == "description" {
+		return a.get_Description(p)
+	} else if colname == "usercommits" {
+		return a.get_UserCommits(p)
+	} else if colname == "deleted" {
+		return a.get_Deleted(p)
+	} else if colname == "deletedtimestamp" {
+		return a.get_DeletedTimestamp(p)
+	} else if colname == "deleteuser" {
+		return a.get_DeleteUser(p)
+	} else if colname == "lastcommit" {
+		return a.get_LastCommit(p)
+	} else if colname == "lastcommituser" {
+		return a.get_LastCommitUser(p)
+	} else if colname == "tags" {
+		return a.get_Tags(p)
+	} else if colname == "forking" {
+		return a.get_Forking(p)
+	} else if colname == "forkedfrom" {
+		return a.get_ForkedFrom(p)
+	} else if colname == "buildroutingtagname" {
+		return a.get_BuildRoutingTagName(p)
+	} else if colname == "buildroutingtagvalue" {
+		return a.get_BuildRoutingTagValue(p)
+	} else if colname == "readonly" {
+		return a.get_ReadOnly(p)
+	} else if colname == "createuser" {
+		return a.get_CreateUser(p)
+	} else if colname == "denymessage" {
+		return a.get_DenyMessage(p)
+	}
+	panic(fmt.Sprintf("in table \"%s\", column \"%s\" cannot be resolved to proto field name", a.Tablename(), colname))
+}
+
 func (a *DBSourceRepository) Tablename() string {
 	return a.SQLTablename
 }
@@ -928,18 +1130,6 @@ func (a *DBSourceRepository) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".filepath, " + a.SQLTablename + ".artefactname, " + a.SQLTablename + ".runpostreceive, " + a.SQLTablename + ".runprereceive, " + a.SQLTablename + ".createdcomplete, " + a.SQLTablename + ".description, " + a.SQLTablename + ".usercommits, " + a.SQLTablename + ".deleted, " + a.SQLTablename + ".deletedtimestamp, " + a.SQLTablename + ".deleteuser, " + a.SQLTablename + ".lastcommit, " + a.SQLTablename + ".lastcommituser, " + a.SQLTablename + ".tags, " + a.SQLTablename + ".forking, " + a.SQLTablename + ".forkedfrom, " + a.SQLTablename + ".buildroutingtagname, " + a.SQLTablename + ".buildroutingtagvalue, " + a.SQLTablename + ".readonly, " + a.SQLTablename + ".createuser, " + a.SQLTablename + ".denymessage"
 }
 
-func (a *DBSourceRepository) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepository, error) {
-	var res []*savepb.SourceRepository
-	for rows.Next() {
-		foo := savepb.SourceRepository{}
-		err := rows.Scan(&foo.ID, &foo.FilePath, &foo.ArtefactName, &foo.RunPostReceive, &foo.RunPreReceive, &foo.CreatedComplete, &foo.Description, &foo.UserCommits, &foo.Deleted, &foo.DeletedTimestamp, &foo.DeleteUser, &foo.LastCommit, &foo.LastCommitUser, &foo.Tags, &foo.Forking, &foo.ForkedFrom, &foo.BuildRoutingTagName, &foo.BuildRoutingTagValue, &foo.ReadOnly, &foo.CreateUser, &foo.DenyMessage)
-		if err != nil {
-			return nil, a.Error(ctx, "fromrow-scan", err)
-		}
-		res = append(res, &foo)
-	}
-	return res, nil
-}
 func (a *DBSourceRepository) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.SourceRepository, error) {
 	var res []*savepb.SourceRepository
 	for rows.Next() {
@@ -1057,6 +1247,6 @@ func (a *DBSourceRepository) Error(ctx context.Context, q string, e error) error
 	if e == nil {
 		return nil
 	}
-	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
+	return errors.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
 

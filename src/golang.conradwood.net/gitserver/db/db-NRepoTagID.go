@@ -2,7 +2,7 @@ package db
 
 /*
  This file was created by mkdb-client.
- The intention is not to modify this file, but you may extend the struct DBWatchers
+ The intention is not to modify this file, but you may extend the struct DBNRepoTagID
  in a seperate file (so that you can regenerate this one from time to time)
 */
 
@@ -12,21 +12,21 @@ package db
 
 /*
  postgres:
- create sequence watchers_seq;
+ create sequence nrepotagid_seq;
 
 Main Table:
 
- CREATE TABLE watchers (id integer primary key default nextval('watchers_seq'),userid text not null  ,repositoryid bigint not null  ,notifytype integer not null  );
+ CREATE TABLE nrepotagid (id integer primary key default nextval('nrepotagid_seq'),repositoryid bigint not null  ,tag bigint not null  ,buildid bigint not null  );
 
 Alter statements:
-ALTER TABLE watchers ADD COLUMN IF NOT EXISTS userid text not null default '';
-ALTER TABLE watchers ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;
-ALTER TABLE watchers ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;
+ALTER TABLE nrepotagid ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;
+ALTER TABLE nrepotagid ADD COLUMN IF NOT EXISTS tag bigint not null default 0;
+ALTER TABLE nrepotagid ADD COLUMN IF NOT EXISTS buildid bigint not null default 0;
 
 
 Archive Table: (structs can be moved from main to archive using Archive() function)
 
- CREATE TABLE watchers_archive (id integer unique not null,userid text not null,repositoryid bigint not null,notifytype integer not null);
+ CREATE TABLE nrepotagid_archive (id integer unique not null,repositoryid bigint not null,tag bigint not null,buildid bigint not null);
 */
 
 import (
@@ -41,10 +41,10 @@ import (
 )
 
 var (
-	default_def_DBWatchers *DBWatchers
+	default_def_DBNRepoTagID *DBNRepoTagID
 )
 
-type DBWatchers struct {
+type DBNRepoTagID struct {
 	DB                   *sql.DB
 	SQLTablename         string
 	SQLArchivetablename  string
@@ -52,47 +52,47 @@ type DBWatchers struct {
 	lock                 sync.Mutex
 }
 
-func DefaultDBWatchers() *DBWatchers {
-	if default_def_DBWatchers != nil {
-		return default_def_DBWatchers
+func DefaultDBNRepoTagID() *DBNRepoTagID {
+	if default_def_DBNRepoTagID != nil {
+		return default_def_DBNRepoTagID
 	}
 	psql, err := sql.Open()
 	if err != nil {
 		fmt.Printf("Failed to open database: %s\n", err)
 		os.Exit(10)
 	}
-	res := NewDBWatchers(psql)
+	res := NewDBNRepoTagID(psql)
 	ctx := context.Background()
 	err = res.CreateTable(ctx)
 	if err != nil {
 		fmt.Printf("Failed to create table: %s\n", err)
 		os.Exit(10)
 	}
-	default_def_DBWatchers = res
+	default_def_DBNRepoTagID = res
 	return res
 }
-func NewDBWatchers(db *sql.DB) *DBWatchers {
-	foo := DBWatchers{DB: db}
-	foo.SQLTablename = "watchers"
-	foo.SQLArchivetablename = "watchers_archive"
+func NewDBNRepoTagID(db *sql.DB) *DBNRepoTagID {
+	foo := DBNRepoTagID{DB: db}
+	foo.SQLTablename = "nrepotagid"
+	foo.SQLArchivetablename = "nrepotagid_archive"
 	return &foo
 }
 
-func (a *DBWatchers) GetCustomColumnHandlers() []CustomColumnHandler {
+func (a *DBNRepoTagID) GetCustomColumnHandlers() []CustomColumnHandler {
 	return a.customColumnHandlers
 }
-func (a *DBWatchers) AddCustomColumnHandler(w CustomColumnHandler) {
+func (a *DBNRepoTagID) AddCustomColumnHandler(w CustomColumnHandler) {
 	a.lock.Lock()
 	a.customColumnHandlers = append(a.customColumnHandlers, w)
 	a.lock.Unlock()
 }
 
-func (a *DBWatchers) NewQuery() *Query {
+func (a *DBNRepoTagID) NewQuery() *Query {
 	return newQuery(a)
 }
 
 // archive. It is NOT transactionally save.
-func (a *DBWatchers) Archive(ctx context.Context, id uint64) error {
+func (a *DBNRepoTagID) Archive(ctx context.Context, id uint64) error {
 
 	// load it
 	p, err := a.ByID(ctx, id)
@@ -101,7 +101,7 @@ func (a *DBWatchers) Archive(ctx context.Context, id uint64) error {
 	}
 
 	// now save it to archive:
-	_, e := a.DB.ExecContext(ctx, "archive_DBWatchers", "insert into "+a.SQLArchivetablename+" (id,userid, repositoryid, notifytype) values ($1,$2, $3, $4) ", p.ID, p.UserID, p.RepositoryID, p.Notifytype)
+	_, e := a.DB.ExecContext(ctx, "archive_DBNRepoTagID", "insert into "+a.SQLArchivetablename+" (id,repositoryid, tag, buildid) values ($1,$2, $3, $4) ", p.ID, p.RepositoryID, p.Tag, p.BuildID)
 	if e != nil {
 		return e
 	}
@@ -112,16 +112,16 @@ func (a *DBWatchers) Archive(ctx context.Context, id uint64) error {
 }
 
 // return a map with columnname -> value_from_proto
-func (a *DBWatchers) buildSaveMap(ctx context.Context, p *savepb.Watchers) (map[string]interface{}, error) {
+func (a *DBNRepoTagID) buildSaveMap(ctx context.Context, p *savepb.NRepoTagID) (map[string]interface{}, error) {
 	extra, err := extraFieldsToStore(ctx, a, p)
 	if err != nil {
 		return nil, err
 	}
 	res := make(map[string]interface{})
 	res["id"] = a.get_col_from_proto(p, "id")
-	res["userid"] = a.get_col_from_proto(p, "userid")
 	res["repositoryid"] = a.get_col_from_proto(p, "repositoryid")
-	res["notifytype"] = a.get_col_from_proto(p, "notifytype")
+	res["tag"] = a.get_col_from_proto(p, "tag")
+	res["buildid"] = a.get_col_from_proto(p, "buildid")
 	if extra != nil {
 		for k, v := range extra {
 			res[k] = v
@@ -130,8 +130,8 @@ func (a *DBWatchers) buildSaveMap(ctx context.Context, p *savepb.Watchers) (map[
 	return res, nil
 }
 
-func (a *DBWatchers) Save(ctx context.Context, p *savepb.Watchers) (uint64, error) {
-	qn := "save_DBWatchers"
+func (a *DBNRepoTagID) Save(ctx context.Context, p *savepb.NRepoTagID) (uint64, error) {
+	qn := "save_DBNRepoTagID"
 	smap, err := a.buildSaveMap(ctx, p)
 	if err != nil {
 		return 0, err
@@ -141,8 +141,8 @@ func (a *DBWatchers) Save(ctx context.Context, p *savepb.Watchers) (uint64, erro
 }
 
 // Save using the ID specified
-func (a *DBWatchers) SaveWithID(ctx context.Context, p *savepb.Watchers) error {
-	qn := "insert_DBWatchers"
+func (a *DBNRepoTagID) SaveWithID(ctx context.Context, p *savepb.NRepoTagID) error {
+	qn := "insert_DBNRepoTagID"
 	smap, err := a.buildSaveMap(ctx, p)
 	if err != nil {
 		return err
@@ -152,7 +152,7 @@ func (a *DBWatchers) SaveWithID(ctx context.Context, p *savepb.Watchers) error {
 }
 
 // use a hashmap of columnname->values to store to database (see buildSaveMap())
-func (a *DBWatchers) saveMap(ctx context.Context, queryname string, smap map[string]interface{}, p *savepb.Watchers) (uint64, error) {
+func (a *DBNRepoTagID) saveMap(ctx context.Context, queryname string, smap map[string]interface{}, p *savepb.NRepoTagID) (uint64, error) {
 	// Save (and use database default ID generation)
 
 	var rows *gosql.Rows
@@ -188,39 +188,39 @@ func (a *DBWatchers) saveMap(ctx context.Context, queryname string, smap map[str
 	return id, nil
 }
 
-func (a *DBWatchers) Update(ctx context.Context, p *savepb.Watchers) error {
-	qn := "DBWatchers_Update"
-	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, repositoryid=$2, notifytype=$3 where id = $4", a.get_UserID(p), a.get_RepositoryID(p), a.get_Notifytype(p), p.ID)
+func (a *DBNRepoTagID) Update(ctx context.Context, p *savepb.NRepoTagID) error {
+	qn := "DBNRepoTagID_Update"
+	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, tag=$2, buildid=$3 where id = $4", a.get_RepositoryID(p), a.get_Tag(p), a.get_BuildID(p), p.ID)
 
 	return a.Error(ctx, qn, e)
 }
 
 // delete by id field
-func (a *DBWatchers) DeleteByID(ctx context.Context, p uint64) error {
-	qn := "deleteDBWatchers_ByID"
+func (a *DBNRepoTagID) DeleteByID(ctx context.Context, p uint64) error {
+	qn := "deleteDBNRepoTagID_ByID"
 	_, e := a.DB.ExecContext(ctx, qn, "delete from "+a.SQLTablename+" where id = $1", p)
 	return a.Error(ctx, qn, e)
 }
 
 // get it by primary id
-func (a *DBWatchers) ByID(ctx context.Context, p uint64) (*savepb.Watchers, error) {
-	qn := "DBWatchers_ByID"
+func (a *DBNRepoTagID) ByID(ctx context.Context, p uint64) (*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByID"
 	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, errors.Errorf("No Watchers with id %v", p))
+		return nil, a.Error(ctx, qn, errors.Errorf("No NRepoTagID with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) Watchers with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) NRepoTagID with id %v", len(l), p))
 	}
 	return l[0], nil
 }
 
 // get it by primary id (nil if no such ID row, but no error either)
-func (a *DBWatchers) TryByID(ctx context.Context, p uint64) (*savepb.Watchers, error) {
-	qn := "DBWatchers_TryByID"
+func (a *DBNRepoTagID) TryByID(ctx context.Context, p uint64) (*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_TryByID"
 	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
@@ -229,14 +229,14 @@ func (a *DBWatchers) TryByID(ctx context.Context, p uint64) (*savepb.Watchers, e
 		return nil, nil
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) Watchers with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) NRepoTagID with id %v", len(l), p))
 	}
 	return l[0], nil
 }
 
 // get it by multiple primary ids
-func (a *DBWatchers) ByIDs(ctx context.Context, p []uint64) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByIDs"
+func (a *DBNRepoTagID) ByIDs(ctx context.Context, p []uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByIDs"
 	l, e := a.fromQuery(ctx, qn, "id in $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
@@ -245,8 +245,8 @@ func (a *DBWatchers) ByIDs(ctx context.Context, p []uint64) ([]*savepb.Watchers,
 }
 
 // get all rows
-func (a *DBWatchers) All(ctx context.Context) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_all"
+func (a *DBNRepoTagID) All(ctx context.Context) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_all"
 	l, e := a.fromQuery(ctx, qn, "true")
 	if e != nil {
 		return nil, errors.Errorf("All: error scanning (%s)", e)
@@ -258,39 +258,9 @@ func (a *DBWatchers) All(ctx context.Context) ([]*savepb.Watchers, error) {
 * GetBy[FIELD] functions
 **********************************************************************/
 
-// get all "DBWatchers" rows with matching UserID
-func (a *DBWatchers) ByUserID(ctx context.Context, p string) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByUserID"
-	l, e := a.fromQuery(ctx, qn, "userid = $1", p)
-	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
-	}
-	return l, nil
-}
-
-// get all "DBWatchers" rows with multiple matching UserID
-func (a *DBWatchers) ByMultiUserID(ctx context.Context, p []string) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByUserID"
-	l, e := a.fromQuery(ctx, qn, "userid in $1", p)
-	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
-	}
-	return l, nil
-}
-
-// the 'like' lookup
-func (a *DBWatchers) ByLikeUserID(ctx context.Context, p string) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByLikeUserID"
-	l, e := a.fromQuery(ctx, qn, "userid ilike $1", p)
-	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
-	}
-	return l, nil
-}
-
-// get all "DBWatchers" rows with matching RepositoryID
-func (a *DBWatchers) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByRepositoryID"
+// get all "DBNRepoTagID" rows with matching RepositoryID
+func (a *DBNRepoTagID) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByRepositoryID"
 	l, e := a.fromQuery(ctx, qn, "repositoryid = $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
@@ -298,9 +268,9 @@ func (a *DBWatchers) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.Wa
 	return l, nil
 }
 
-// get all "DBWatchers" rows with multiple matching RepositoryID
-func (a *DBWatchers) ByMultiRepositoryID(ctx context.Context, p []uint64) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByRepositoryID"
+// get all "DBNRepoTagID" rows with multiple matching RepositoryID
+func (a *DBNRepoTagID) ByMultiRepositoryID(ctx context.Context, p []uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByRepositoryID"
 	l, e := a.fromQuery(ctx, qn, "repositoryid in $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
@@ -309,8 +279,8 @@ func (a *DBWatchers) ByMultiRepositoryID(ctx context.Context, p []uint64) ([]*sa
 }
 
 // the 'like' lookup
-func (a *DBWatchers) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByLikeRepositoryID"
+func (a *DBNRepoTagID) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByLikeRepositoryID"
 	l, e := a.fromQuery(ctx, qn, "repositoryid ilike $1", p)
 	if e != nil {
 		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
@@ -318,32 +288,62 @@ func (a *DBWatchers) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savep
 	return l, nil
 }
 
-// get all "DBWatchers" rows with matching Notifytype
-func (a *DBWatchers) ByNotifytype(ctx context.Context, p uint32) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByNotifytype"
-	l, e := a.fromQuery(ctx, qn, "notifytype = $1", p)
+// get all "DBNRepoTagID" rows with matching Tag
+func (a *DBNRepoTagID) ByTag(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByTag"
+	l, e := a.fromQuery(ctx, qn, "tag = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByNotifytype: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTag: error scanning (%s)", e))
 	}
 	return l, nil
 }
 
-// get all "DBWatchers" rows with multiple matching Notifytype
-func (a *DBWatchers) ByMultiNotifytype(ctx context.Context, p []uint32) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByNotifytype"
-	l, e := a.fromQuery(ctx, qn, "notifytype in $1", p)
+// get all "DBNRepoTagID" rows with multiple matching Tag
+func (a *DBNRepoTagID) ByMultiTag(ctx context.Context, p []uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByTag"
+	l, e := a.fromQuery(ctx, qn, "tag in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByNotifytype: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTag: error scanning (%s)", e))
 	}
 	return l, nil
 }
 
 // the 'like' lookup
-func (a *DBWatchers) ByLikeNotifytype(ctx context.Context, p uint32) ([]*savepb.Watchers, error) {
-	qn := "DBWatchers_ByLikeNotifytype"
-	l, e := a.fromQuery(ctx, qn, "notifytype ilike $1", p)
+func (a *DBNRepoTagID) ByLikeTag(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByLikeTag"
+	l, e := a.fromQuery(ctx, qn, "tag ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, errors.Errorf("ByNotifytype: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByTag: error scanning (%s)", e))
+	}
+	return l, nil
+}
+
+// get all "DBNRepoTagID" rows with matching BuildID
+func (a *DBNRepoTagID) ByBuildID(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByBuildID"
+	l, e := a.fromQuery(ctx, qn, "buildid = $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildID: error scanning (%s)", e))
+	}
+	return l, nil
+}
+
+// get all "DBNRepoTagID" rows with multiple matching BuildID
+func (a *DBNRepoTagID) ByMultiBuildID(ctx context.Context, p []uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByBuildID"
+	l, e := a.fromQuery(ctx, qn, "buildid in $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildID: error scanning (%s)", e))
+	}
+	return l, nil
+}
+
+// the 'like' lookup
+func (a *DBNRepoTagID) ByLikeBuildID(ctx context.Context, p uint64) ([]*savepb.NRepoTagID, error) {
+	qn := "DBNRepoTagID_ByLikeBuildID"
+	l, e := a.fromQuery(ctx, qn, "buildid ilike $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("ByBuildID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -353,23 +353,23 @@ func (a *DBWatchers) ByLikeNotifytype(ctx context.Context, p uint32) ([]*savepb.
 **********************************************************************/
 
 // getter for field "ID" (ID) [uint64]
-func (a *DBWatchers) get_ID(p *savepb.Watchers) uint64 {
+func (a *DBNRepoTagID) get_ID(p *savepb.NRepoTagID) uint64 {
 	return uint64(p.ID)
 }
 
-// getter for field "UserID" (UserID) [string]
-func (a *DBWatchers) get_UserID(p *savepb.Watchers) string {
-	return string(p.UserID)
-}
-
 // getter for field "RepositoryID" (RepositoryID) [uint64]
-func (a *DBWatchers) get_RepositoryID(p *savepb.Watchers) uint64 {
+func (a *DBNRepoTagID) get_RepositoryID(p *savepb.NRepoTagID) uint64 {
 	return uint64(p.RepositoryID)
 }
 
-// getter for field "Notifytype" (Notifytype) [uint32]
-func (a *DBWatchers) get_Notifytype(p *savepb.Watchers) uint32 {
-	return uint32(p.Notifytype)
+// getter for field "Tag" (Tag) [uint64]
+func (a *DBNRepoTagID) get_Tag(p *savepb.NRepoTagID) uint64 {
+	return uint64(p.Tag)
+}
+
+// getter for field "BuildID" (BuildID) [uint64]
+func (a *DBNRepoTagID) get_BuildID(p *savepb.NRepoTagID) uint64 {
+	return uint64(p.BuildID)
 }
 
 /**********************************************************************
@@ -377,7 +377,7 @@ func (a *DBWatchers) get_Notifytype(p *savepb.Watchers) uint32 {
 **********************************************************************/
 
 // from a query snippet (the part after WHERE)
-func (a *DBWatchers) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.Watchers, error) {
+func (a *DBNRepoTagID) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.NRepoTagID, error) {
 	extra_fields, err := extraFieldsToQuery(ctx, a)
 	if err != nil {
 		return nil, err
@@ -404,12 +404,12 @@ func (a *DBWatchers) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.Wat
 
 }
 
-func (a *DBWatchers) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.Watchers, error) {
+func (a *DBNRepoTagID) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.NRepoTagID, error) {
 	return a.fromQuery(ctx, "custom_query_"+a.Tablename(), query_where, args...)
 }
 
 // from a query snippet (the part after WHERE)
-func (a *DBWatchers) fromQuery(ctx context.Context, queryname string, query_where string, args ...interface{}) ([]*savepb.Watchers, error) {
+func (a *DBNRepoTagID) fromQuery(ctx context.Context, queryname string, query_where string, args ...interface{}) ([]*savepb.NRepoTagID, error) {
 	extra_fields, err := extraFieldsToQuery(ctx, a)
 	if err != nil {
 		return nil, err
@@ -443,41 +443,41 @@ func (a *DBWatchers) fromQuery(ctx context.Context, queryname string, query_wher
 /**********************************************************************
 * Helper to convert from an SQL Row to struct
 **********************************************************************/
-func (a *DBWatchers) get_col_from_proto(p *savepb.Watchers, colname string) interface{} {
+func (a *DBNRepoTagID) get_col_from_proto(p *savepb.NRepoTagID, colname string) interface{} {
 	if colname == "id" {
 		return a.get_ID(p)
-	} else if colname == "userid" {
-		return a.get_UserID(p)
 	} else if colname == "repositoryid" {
 		return a.get_RepositoryID(p)
-	} else if colname == "notifytype" {
-		return a.get_Notifytype(p)
+	} else if colname == "tag" {
+		return a.get_Tag(p)
+	} else if colname == "buildid" {
+		return a.get_BuildID(p)
 	}
 	panic(fmt.Sprintf("in table \"%s\", column \"%s\" cannot be resolved to proto field name", a.Tablename(), colname))
 }
 
-func (a *DBWatchers) Tablename() string {
+func (a *DBNRepoTagID) Tablename() string {
 	return a.SQLTablename
 }
 
-func (a *DBWatchers) SelectCols() string {
-	return "id,userid, repositoryid, notifytype"
+func (a *DBNRepoTagID) SelectCols() string {
+	return "id,repositoryid, tag, buildid"
 }
-func (a *DBWatchers) SelectColsQualified() string {
-	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".notifytype"
+func (a *DBNRepoTagID) SelectColsQualified() string {
+	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".tag, " + a.SQLTablename + ".buildid"
 }
 
-func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.Watchers, error) {
-	var res []*savepb.Watchers
+func (a *DBNRepoTagID) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.NRepoTagID, error) {
+	var res []*savepb.NRepoTagID
 	for rows.Next() {
 		// SCANNER:
-		foo := &savepb.Watchers{}
+		foo := &savepb.NRepoTagID{}
 		// create the non-nullable pointers
 		// create variables for scan results
 		scanTarget_0 := &foo.ID
-		scanTarget_1 := &foo.UserID
-		scanTarget_2 := &foo.RepositoryID
-		scanTarget_3 := &foo.Notifytype
+		scanTarget_1 := &foo.RepositoryID
+		scanTarget_2 := &foo.Tag
+		scanTarget_3 := &foo.BuildID
 		err := rows.Scan(scanTarget_0, scanTarget_1, scanTarget_2, scanTarget_3)
 		// END SCANNER
 
@@ -492,18 +492,18 @@ func (a *DBWatchers) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.
 /**********************************************************************
 * Helper to create table and columns
 **********************************************************************/
-func (a *DBWatchers) CreateTable(ctx context.Context) error {
+func (a *DBNRepoTagID) CreateTable(ctx context.Context) error {
 	csql := []string{
 		`create sequence if not exists ` + a.SQLTablename + `_seq;`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
-		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),userid text not null ,repositoryid bigint not null ,notifytype integer not null );`,
-		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS userid text not null default '';`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + ` (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,tag bigint not null ,buildid bigint not null );`,
+		`CREATE TABLE if not exists ` + a.SQLTablename + `_archive (id integer primary key default nextval('` + a.SQLTablename + `_seq'),repositoryid bigint not null ,tag bigint not null ,buildid bigint not null );`,
 		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS repositoryid bigint not null default 0;`,
-		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS notifytype integer not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS tag bigint not null default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + ` ADD COLUMN IF NOT EXISTS buildid bigint not null default 0;`,
 
-		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS userid text not null  default '';`,
 		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS repositoryid bigint not null  default 0;`,
-		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS notifytype integer not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS tag bigint not null  default 0;`,
+		`ALTER TABLE ` + a.SQLTablename + `_archive  ADD COLUMN IF NOT EXISTS buildid bigint not null  default 0;`,
 	}
 
 	for i, c := range csql {
@@ -529,7 +529,7 @@ func (a *DBWatchers) CreateTable(ctx context.Context) error {
 /**********************************************************************
 * Helper to meaningful errors
 **********************************************************************/
-func (a *DBWatchers) Error(ctx context.Context, q string, e error) error {
+func (a *DBNRepoTagID) Error(ctx context.Context, q string, e error) error {
 	if e == nil {
 		return nil
 	}

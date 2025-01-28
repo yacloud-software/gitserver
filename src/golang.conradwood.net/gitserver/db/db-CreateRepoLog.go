@@ -2,7 +2,7 @@ package db
 
 /*
  This file was created by mkdb-client.
- The intention is not to modify thils file, but you may extend the struct DBCreateRepoLog
+ The intention is not to modify this file, but you may extend the struct DBCreateRepoLog
  in a seperate file (so that you can regenerate this one from time to time)
 */
 
@@ -40,8 +40,10 @@ import (
 	gosql "database/sql"
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/sql"
 	"os"
+	"sync"
 )
 
 var (
@@ -49,9 +51,11 @@ var (
 )
 
 type DBCreateRepoLog struct {
-	DB                  *sql.DB
-	SQLTablename        string
-	SQLArchivetablename string
+	DB                   *sql.DB
+	SQLTablename         string
+	SQLArchivetablename  string
+	customColumnHandlers []CustomColumnHandler
+	lock                 sync.Mutex
 }
 
 func DefaultDBCreateRepoLog() *DBCreateRepoLog {
@@ -80,6 +84,19 @@ func NewDBCreateRepoLog(db *sql.DB) *DBCreateRepoLog {
 	return &foo
 }
 
+func (a *DBCreateRepoLog) GetCustomColumnHandlers() []CustomColumnHandler {
+	return a.customColumnHandlers
+}
+func (a *DBCreateRepoLog) AddCustomColumnHandler(w CustomColumnHandler) {
+	a.lock.Lock()
+	a.customColumnHandlers = append(a.customColumnHandlers, w)
+	a.lock.Unlock()
+}
+
+func (a *DBCreateRepoLog) NewQuery() *Query {
+	return newQuery(a)
+}
+
 // archive. It is NOT transactionally save.
 func (a *DBCreateRepoLog) Archive(ctx context.Context, id uint64) error {
 
@@ -100,31 +117,87 @@ func (a *DBCreateRepoLog) Archive(ctx context.Context, id uint64) error {
 	return nil
 }
 
-// Save (and use database default ID generation)
+// return a map with columnname -> value_from_proto
+func (a *DBCreateRepoLog) buildSaveMap(ctx context.Context, p *savepb.CreateRepoLog) (map[string]interface{}, error) {
+	extra, err := extraFieldsToStore(ctx, a, p)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]interface{})
+	res["id"] = a.get_col_from_proto(p, "id")
+	res["repositoryid"] = a.get_col_from_proto(p, "repositoryid")
+	res["userid"] = a.get_col_from_proto(p, "userid")
+	res["context"] = a.get_col_from_proto(p, "context")
+	res["action"] = a.get_col_from_proto(p, "action")
+	res["success"] = a.get_col_from_proto(p, "success")
+	res["errormessage"] = a.get_col_from_proto(p, "errormessage")
+	res["started"] = a.get_col_from_proto(p, "started")
+	res["finished"] = a.get_col_from_proto(p, "finished")
+	res["associationtoken"] = a.get_col_from_proto(p, "associationtoken")
+	if extra != nil {
+		for k, v := range extra {
+			res[k] = v
+		}
+	}
+	return res, nil
+}
+
 func (a *DBCreateRepoLog) Save(ctx context.Context, p *savepb.CreateRepoLog) (uint64, error) {
-	qn := "DBCreateRepoLog_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id", a.get_RepositoryID(p), a.get_UserID(p), a.get_Context(p), a.get_Action(p), a.get_Success(p), a.get_ErrorMessage(p), a.get_Started(p), a.get_Finished(p), a.get_AssociationToken(p))
-	if e != nil {
-		return 0, a.Error(ctx, qn, e)
+	qn := "save_DBCreateRepoLog"
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return 0, err
 	}
-	defer rows.Close()
-	if !rows.Next() {
-		return 0, a.Error(ctx, qn, fmt.Errorf("No rows after insert"))
-	}
-	var id uint64
-	e = rows.Scan(&id)
-	if e != nil {
-		return 0, a.Error(ctx, qn, fmt.Errorf("failed to scan id after insert: %s", e))
-	}
-	p.ID = id
-	return id, nil
+	delete(smap, "id") // save without id
+	return a.saveMap(ctx, qn, smap, p)
 }
 
 // Save using the ID specified
 func (a *DBCreateRepoLog) SaveWithID(ctx context.Context, p *savepb.CreateRepoLog) error {
 	qn := "insert_DBCreateRepoLog"
-	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken) values ($1,$2, $3, $4, $5, $6, $7, $8, $9, $10) ", p.ID, p.RepositoryID, p.UserID, p.Context, p.Action, p.Success, p.ErrorMessage, p.Started, p.Finished, p.AssociationToken)
-	return a.Error(ctx, qn, e)
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return err
+	}
+	_, err = a.saveMap(ctx, qn, smap, p)
+	return err
+}
+
+// use a hashmap of columnname->values to store to database (see buildSaveMap())
+func (a *DBCreateRepoLog) saveMap(ctx context.Context, queryname string, smap map[string]interface{}, p *savepb.CreateRepoLog) (uint64, error) {
+	// Save (and use database default ID generation)
+
+	var rows *gosql.Rows
+	var e error
+
+	q_cols := ""
+	q_valnames := ""
+	q_vals := make([]interface{}, 0)
+	deli := ""
+	i := 0
+	// build the 2 parts of the query (column names and value names) as well as the values themselves
+	for colname, val := range smap {
+		q_cols = q_cols + deli + colname
+		i++
+		q_valnames = q_valnames + deli + fmt.Sprintf("$%d", i)
+		q_vals = append(q_vals, val)
+		deli = ","
+	}
+	rows, e = a.DB.QueryContext(ctx, queryname, "insert into "+a.SQLTablename+" ("+q_cols+") values ("+q_valnames+") returning id", q_vals...)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, e)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, a.Error(ctx, queryname, errors.Errorf("No rows after insert"))
+	}
+	var id uint64
+	e = rows.Scan(&id)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, errors.Errorf("failed to scan id after insert: %s", e))
+	}
+	p.ID = id
+	return id, nil
 }
 
 func (a *DBCreateRepoLog) Update(ctx context.Context, p *savepb.CreateRepoLog) error {
@@ -144,20 +217,15 @@ func (a *DBCreateRepoLog) DeleteByID(ctx context.Context, p uint64) error {
 // get it by primary id
 func (a *DBCreateRepoLog) ByID(ctx context.Context, p uint64) (*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No CreateRepoLog with id %v", p))
+		return nil, a.Error(ctx, qn, errors.Errorf("No CreateRepoLog with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) CreateRepoLog with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) CreateRepoLog with id %v", len(l), p))
 	}
 	return l[0], nil
 }
@@ -165,35 +233,35 @@ func (a *DBCreateRepoLog) ByID(ctx context.Context, p uint64) (*savepb.CreateRep
 // get it by primary id (nil if no such ID row, but no error either)
 func (a *DBCreateRepoLog) TryByID(ctx context.Context, p uint64) (*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_TryByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
 		return nil, nil
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) CreateRepoLog with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) CreateRepoLog with id %v", len(l), p))
 	}
 	return l[0], nil
+}
+
+// get it by multiple primary ids
+func (a *DBCreateRepoLog) ByIDs(ctx context.Context, p []uint64) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByIDs"
+	l, e := a.fromQuery(ctx, qn, "id in $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
+	}
+	return l, nil
 }
 
 // get all rows
 func (a *DBCreateRepoLog) All(ctx context.Context) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_all"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" order by id")
+	l, e := a.fromQuery(ctx, qn, "true")
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("All: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, fmt.Errorf("All: error scanning (%s)", e)
+		return nil, errors.Errorf("All: error scanning (%s)", e)
 	}
 	return l, nil
 }
@@ -205,14 +273,19 @@ func (a *DBCreateRepoLog) All(ctx context.Context) ([]*savepb.CreateRepoLog, err
 // get all "DBCreateRepoLog" rows with matching RepositoryID
 func (a *DBCreateRepoLog) ByRepositoryID(ctx context.Context, p uint64) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByRepositoryID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where repositoryid = $1", p)
+	l, e := a.fromQuery(ctx, qn, "repositoryid = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching RepositoryID
+func (a *DBCreateRepoLog) ByMultiRepositoryID(ctx context.Context, p []uint64) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByRepositoryID"
+	l, e := a.fromQuery(ctx, qn, "repositoryid in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -220,14 +293,9 @@ func (a *DBCreateRepoLog) ByRepositoryID(ctx context.Context, p uint64) ([]*save
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeRepositoryID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where repositoryid ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "repositoryid ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByRepositoryID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByRepositoryID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -235,14 +303,19 @@ func (a *DBCreateRepoLog) ByLikeRepositoryID(ctx context.Context, p uint64) ([]*
 // get all "DBCreateRepoLog" rows with matching UserID
 func (a *DBCreateRepoLog) ByUserID(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where userid = $1", p)
+	l, e := a.fromQuery(ctx, qn, "userid = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching UserID
+func (a *DBCreateRepoLog) ByMultiUserID(ctx context.Context, p []string) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByUserID"
+	l, e := a.fromQuery(ctx, qn, "userid in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -250,14 +323,9 @@ func (a *DBCreateRepoLog) ByUserID(ctx context.Context, p string) ([]*savepb.Cre
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeUserID(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where userid ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "userid ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -265,14 +333,19 @@ func (a *DBCreateRepoLog) ByLikeUserID(ctx context.Context, p string) ([]*savepb
 // get all "DBCreateRepoLog" rows with matching Context
 func (a *DBCreateRepoLog) ByContext(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByContext"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where context = $1", p)
+	l, e := a.fromQuery(ctx, qn, "context = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByContext: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByContext: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching Context
+func (a *DBCreateRepoLog) ByMultiContext(ctx context.Context, p []string) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByContext"
+	l, e := a.fromQuery(ctx, qn, "context in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByContext: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByContext: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -280,14 +353,9 @@ func (a *DBCreateRepoLog) ByContext(ctx context.Context, p string) ([]*savepb.Cr
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeContext(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeContext"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where context ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "context ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByContext: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByContext: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByContext: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -295,14 +363,19 @@ func (a *DBCreateRepoLog) ByLikeContext(ctx context.Context, p string) ([]*savep
 // get all "DBCreateRepoLog" rows with matching Action
 func (a *DBCreateRepoLog) ByAction(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByAction"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where action = $1", p)
+	l, e := a.fromQuery(ctx, qn, "action = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAction: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAction: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching Action
+func (a *DBCreateRepoLog) ByMultiAction(ctx context.Context, p []uint32) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByAction"
+	l, e := a.fromQuery(ctx, qn, "action in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAction: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAction: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -310,14 +383,9 @@ func (a *DBCreateRepoLog) ByAction(ctx context.Context, p uint32) ([]*savepb.Cre
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeAction(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeAction"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where action ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "action ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAction: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAction: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAction: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -325,14 +393,19 @@ func (a *DBCreateRepoLog) ByLikeAction(ctx context.Context, p uint32) ([]*savepb
 // get all "DBCreateRepoLog" rows with matching Success
 func (a *DBCreateRepoLog) BySuccess(ctx context.Context, p bool) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_BySuccess"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where success = $1", p)
+	l, e := a.fromQuery(ctx, qn, "success = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("BySuccess: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching Success
+func (a *DBCreateRepoLog) ByMultiSuccess(ctx context.Context, p []bool) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_BySuccess"
+	l, e := a.fromQuery(ctx, qn, "success in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("BySuccess: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -340,14 +413,9 @@ func (a *DBCreateRepoLog) BySuccess(ctx context.Context, p bool) ([]*savepb.Crea
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeSuccess(ctx context.Context, p bool) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeSuccess"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where success ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "success ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("BySuccess: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("BySuccess: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -355,14 +423,19 @@ func (a *DBCreateRepoLog) ByLikeSuccess(ctx context.Context, p bool) ([]*savepb.
 // get all "DBCreateRepoLog" rows with matching ErrorMessage
 func (a *DBCreateRepoLog) ByErrorMessage(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByErrorMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where errormessage = $1", p)
+	l, e := a.fromQuery(ctx, qn, "errormessage = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByErrorMessage: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByErrorMessage: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching ErrorMessage
+func (a *DBCreateRepoLog) ByMultiErrorMessage(ctx context.Context, p []string) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByErrorMessage"
+	l, e := a.fromQuery(ctx, qn, "errormessage in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByErrorMessage: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByErrorMessage: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -370,14 +443,9 @@ func (a *DBCreateRepoLog) ByErrorMessage(ctx context.Context, p string) ([]*save
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeErrorMessage(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeErrorMessage"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where errormessage ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "errormessage ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByErrorMessage: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByErrorMessage: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByErrorMessage: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -385,14 +453,19 @@ func (a *DBCreateRepoLog) ByLikeErrorMessage(ctx context.Context, p string) ([]*
 // get all "DBCreateRepoLog" rows with matching Started
 func (a *DBCreateRepoLog) ByStarted(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByStarted"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where started = $1", p)
+	l, e := a.fromQuery(ctx, qn, "started = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByStarted: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByStarted: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching Started
+func (a *DBCreateRepoLog) ByMultiStarted(ctx context.Context, p []uint32) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByStarted"
+	l, e := a.fromQuery(ctx, qn, "started in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByStarted: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByStarted: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -400,14 +473,9 @@ func (a *DBCreateRepoLog) ByStarted(ctx context.Context, p uint32) ([]*savepb.Cr
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeStarted(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeStarted"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where started ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "started ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByStarted: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByStarted: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByStarted: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -415,14 +483,19 @@ func (a *DBCreateRepoLog) ByLikeStarted(ctx context.Context, p uint32) ([]*savep
 // get all "DBCreateRepoLog" rows with matching Finished
 func (a *DBCreateRepoLog) ByFinished(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByFinished"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where finished = $1", p)
+	l, e := a.fromQuery(ctx, qn, "finished = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFinished: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFinished: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching Finished
+func (a *DBCreateRepoLog) ByMultiFinished(ctx context.Context, p []uint32) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByFinished"
+	l, e := a.fromQuery(ctx, qn, "finished in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFinished: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFinished: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -430,14 +503,9 @@ func (a *DBCreateRepoLog) ByFinished(ctx context.Context, p uint32) ([]*savepb.C
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeFinished(ctx context.Context, p uint32) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeFinished"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where finished ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "finished ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFinished: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByFinished: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByFinished: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -445,14 +513,19 @@ func (a *DBCreateRepoLog) ByLikeFinished(ctx context.Context, p uint32) ([]*save
 // get all "DBCreateRepoLog" rows with matching AssociationToken
 func (a *DBCreateRepoLog) ByAssociationToken(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByAssociationToken"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where associationtoken = $1", p)
+	l, e := a.fromQuery(ctx, qn, "associationtoken = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAssociationToken: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAssociationToken: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBCreateRepoLog" rows with multiple matching AssociationToken
+func (a *DBCreateRepoLog) ByMultiAssociationToken(ctx context.Context, p []string) ([]*savepb.CreateRepoLog, error) {
+	qn := "DBCreateRepoLog_ByAssociationToken"
+	l, e := a.fromQuery(ctx, qn, "associationtoken in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAssociationToken: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAssociationToken: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -460,14 +533,9 @@ func (a *DBCreateRepoLog) ByAssociationToken(ctx context.Context, p string) ([]*
 // the 'like' lookup
 func (a *DBCreateRepoLog) ByLikeAssociationToken(ctx context.Context, p string) ([]*savepb.CreateRepoLog, error) {
 	qn := "DBCreateRepoLog_ByLikeAssociationToken"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,repositoryid, userid, context, action, success, errormessage, started, finished, associationtoken from "+a.SQLTablename+" where associationtoken ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "associationtoken ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAssociationToken: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByAssociationToken: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByAssociationToken: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -476,44 +544,54 @@ func (a *DBCreateRepoLog) ByLikeAssociationToken(ctx context.Context, p string) 
 * The field getters
 **********************************************************************/
 
+// getter for field "ID" (ID) [uint64]
 func (a *DBCreateRepoLog) get_ID(p *savepb.CreateRepoLog) uint64 {
-	return p.ID
+	return uint64(p.ID)
 }
 
+// getter for field "RepositoryID" (RepositoryID) [uint64]
 func (a *DBCreateRepoLog) get_RepositoryID(p *savepb.CreateRepoLog) uint64 {
-	return p.RepositoryID
+	return uint64(p.RepositoryID)
 }
 
+// getter for field "UserID" (UserID) [string]
 func (a *DBCreateRepoLog) get_UserID(p *savepb.CreateRepoLog) string {
-	return p.UserID
+	return string(p.UserID)
 }
 
+// getter for field "Context" (Context) [string]
 func (a *DBCreateRepoLog) get_Context(p *savepb.CreateRepoLog) string {
-	return p.Context
+	return string(p.Context)
 }
 
+// getter for field "Action" (Action) [uint32]
 func (a *DBCreateRepoLog) get_Action(p *savepb.CreateRepoLog) uint32 {
-	return p.Action
+	return uint32(p.Action)
 }
 
+// getter for field "Success" (Success) [bool]
 func (a *DBCreateRepoLog) get_Success(p *savepb.CreateRepoLog) bool {
-	return p.Success
+	return bool(p.Success)
 }
 
+// getter for field "ErrorMessage" (ErrorMessage) [string]
 func (a *DBCreateRepoLog) get_ErrorMessage(p *savepb.CreateRepoLog) string {
-	return p.ErrorMessage
+	return string(p.ErrorMessage)
 }
 
+// getter for field "Started" (Started) [uint32]
 func (a *DBCreateRepoLog) get_Started(p *savepb.CreateRepoLog) uint32 {
-	return p.Started
+	return uint32(p.Started)
 }
 
+// getter for field "Finished" (Finished) [uint32]
 func (a *DBCreateRepoLog) get_Finished(p *savepb.CreateRepoLog) uint32 {
-	return p.Finished
+	return uint32(p.Finished)
 }
 
+// getter for field "AssociationToken" (AssociationToken) [string]
 func (a *DBCreateRepoLog) get_AssociationToken(p *savepb.CreateRepoLog) string {
-	return p.AssociationToken
+	return string(p.AssociationToken)
 }
 
 /**********************************************************************
@@ -521,17 +599,97 @@ func (a *DBCreateRepoLog) get_AssociationToken(p *savepb.CreateRepoLog) string {
 **********************************************************************/
 
 // from a query snippet (the part after WHERE)
-func (a *DBCreateRepoLog) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.CreateRepoLog, error) {
-	rows, err := a.DB.QueryContext(ctx, "custom_query_"+a.Tablename(), "select "+a.SelectCols()+" from "+a.Tablename()+" where "+query_where, args...)
+func (a *DBCreateRepoLog) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.CreateRepoLog, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
 	if err != nil {
 		return nil, err
 	}
-	return a.FromRows(ctx, rows)
+	i := 0
+	for col_name, value := range extra_fields {
+		i++
+		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
+		query.Add(col_name+" = "+efname, QP{efname: value})
+	}
+
+	gw, paras := query.ToPostgres()
+	queryname := "custom_dbquery"
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where "+gw, paras...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+
+}
+
+func (a *DBCreateRepoLog) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.CreateRepoLog, error) {
+	return a.fromQuery(ctx, "custom_query_"+a.Tablename(), query_where, args...)
+}
+
+// from a query snippet (the part after WHERE)
+func (a *DBCreateRepoLog) fromQuery(ctx context.Context, queryname string, query_where string, args ...interface{}) ([]*savepb.CreateRepoLog, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	eq := ""
+	if extra_fields != nil && len(extra_fields) > 0 {
+		eq = " AND ("
+		// build the extraquery "eq"
+		i := len(args)
+		deli := ""
+		for col_name, value := range extra_fields {
+			i++
+			eq = eq + deli + col_name + fmt.Sprintf(" = $%d", i)
+			deli = " AND "
+			args = append(args, value)
+		}
+		eq = eq + ")"
+	}
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where ( "+query_where+") "+eq, args...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 /**********************************************************************
 * Helper to convert from an SQL Row to struct
 **********************************************************************/
+func (a *DBCreateRepoLog) get_col_from_proto(p *savepb.CreateRepoLog, colname string) interface{} {
+	if colname == "id" {
+		return a.get_ID(p)
+	} else if colname == "repositoryid" {
+		return a.get_RepositoryID(p)
+	} else if colname == "userid" {
+		return a.get_UserID(p)
+	} else if colname == "context" {
+		return a.get_Context(p)
+	} else if colname == "action" {
+		return a.get_Action(p)
+	} else if colname == "success" {
+		return a.get_Success(p)
+	} else if colname == "errormessage" {
+		return a.get_ErrorMessage(p)
+	} else if colname == "started" {
+		return a.get_Started(p)
+	} else if colname == "finished" {
+		return a.get_Finished(p)
+	} else if colname == "associationtoken" {
+		return a.get_AssociationToken(p)
+	}
+	panic(fmt.Sprintf("in table \"%s\", column \"%s\" cannot be resolved to proto field name", a.Tablename(), colname))
+}
+
 func (a *DBCreateRepoLog) Tablename() string {
 	return a.SQLTablename
 }
@@ -543,18 +701,6 @@ func (a *DBCreateRepoLog) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".repositoryid, " + a.SQLTablename + ".userid, " + a.SQLTablename + ".context, " + a.SQLTablename + ".action, " + a.SQLTablename + ".success, " + a.SQLTablename + ".errormessage, " + a.SQLTablename + ".started, " + a.SQLTablename + ".finished, " + a.SQLTablename + ".associationtoken"
 }
 
-func (a *DBCreateRepoLog) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.CreateRepoLog, error) {
-	var res []*savepb.CreateRepoLog
-	for rows.Next() {
-		foo := savepb.CreateRepoLog{}
-		err := rows.Scan(&foo.ID, &foo.RepositoryID, &foo.UserID, &foo.Context, &foo.Action, &foo.Success, &foo.ErrorMessage, &foo.Started, &foo.Finished, &foo.AssociationToken)
-		if err != nil {
-			return nil, a.Error(ctx, "fromrow-scan", err)
-		}
-		res = append(res, &foo)
-	}
-	return res, nil
-}
 func (a *DBCreateRepoLog) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.CreateRepoLog, error) {
 	var res []*savepb.CreateRepoLog
 	for rows.Next() {
@@ -639,6 +785,6 @@ func (a *DBCreateRepoLog) Error(ctx context.Context, q string, e error) error {
 	if e == nil {
 		return nil
 	}
-	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
+	return errors.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
 

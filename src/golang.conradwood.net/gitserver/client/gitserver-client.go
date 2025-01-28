@@ -3,18 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+
 	"golang.conradwood.net/apis/common"
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
+
 	//	"golang.conradwood.net/go-easyops/client"
-	"golang.conradwood.net/go-easyops/ctx"
-	"golang.conradwood.net/go-easyops/utils"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"golang.conradwood.net/go-easyops/ctx"
+	"golang.conradwood.net/go-easyops/utils"
 )
 
 var (
@@ -40,10 +43,21 @@ var (
 	rebuild     = flag.Uint64("rebuild", 0, "trigger a build")
 	denymsg     = flag.Bool("denymsg", false, "if set, disable a repo with the message. ")
 	message     = flag.String("message", "", "the message to set or clear")
+	build       = flag.Uint64("build", 0, "build to operate on")
+	set_tag     = flag.Uint64("tag_set", 0, "set tag on a given build")
+	get_tag     = flag.Uint64("tag_get", 0, "get tag from a repo")
 )
 
 func main() {
 	flag.Parse()
+	if *set_tag != 0 {
+		utils.Bail("failed to set deny message: ", SetTag())
+		os.Exit(0)
+	}
+	if *get_tag != 0 {
+		utils.Bail("failed to set deny message: ", GetTag())
+		os.Exit(0)
+	}
 	if *denymsg {
 		utils.Bail("failed to set deny message: ", denyMsg())
 		os.Exit(0)
@@ -285,5 +299,29 @@ func denyMsg() error {
 	return nil
 }
 
-
-
+func GetTag() error {
+	tag := *get_tag
+	nreq := &pb.GetNTagRequest{RepositoryID: uint64(*repoid), Tag: tag}
+	ctx := authremote.Context()
+	nres, err := pb.GetGIT2Client().GetBuildWithNTag(ctx, nreq)
+	if err != nil {
+		return err
+	}
+	if nres.NTag == nil {
+		fmt.Printf("No build with tag %d in repo %d\n", nreq.Tag, nreq.RepositoryID)
+		return nil
+	}
+	fmt.Printf("Build: %d\n", nres.NTag.BuildID)
+	return nil
+}
+func SetTag() error {
+	tag := *get_tag
+	nreq := &pb.AttachNTagRequest{RepositoryID: uint64(*repoid), BuildID: uint64(*build), Tag: tag}
+	ctx := authremote.Context()
+	_, err := pb.GetGIT2Client().AttachNTagToBuild(ctx, nreq)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Attached tag %d in repo %d to build %d\n", nreq.Tag, nreq.RepositoryID, nreq.BuildID)
+	return nil
+}

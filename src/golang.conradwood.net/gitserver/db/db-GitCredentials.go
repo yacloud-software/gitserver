@@ -2,7 +2,7 @@ package db
 
 /*
  This file was created by mkdb-client.
- The intention is not to modify thils file, but you may extend the struct DBGitCredentials
+ The intention is not to modify this file, but you may extend the struct DBGitCredentials
  in a seperate file (so that you can regenerate this one from time to time)
 */
 
@@ -37,8 +37,10 @@ import (
 	gosql "database/sql"
 	"fmt"
 	savepb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/sql"
 	"os"
+	"sync"
 )
 
 var (
@@ -46,9 +48,11 @@ var (
 )
 
 type DBGitCredentials struct {
-	DB                  *sql.DB
-	SQLTablename        string
-	SQLArchivetablename string
+	DB                   *sql.DB
+	SQLTablename         string
+	SQLArchivetablename  string
+	customColumnHandlers []CustomColumnHandler
+	lock                 sync.Mutex
 }
 
 func DefaultDBGitCredentials() *DBGitCredentials {
@@ -77,6 +81,19 @@ func NewDBGitCredentials(db *sql.DB) *DBGitCredentials {
 	return &foo
 }
 
+func (a *DBGitCredentials) GetCustomColumnHandlers() []CustomColumnHandler {
+	return a.customColumnHandlers
+}
+func (a *DBGitCredentials) AddCustomColumnHandler(w CustomColumnHandler) {
+	a.lock.Lock()
+	a.customColumnHandlers = append(a.customColumnHandlers, w)
+	a.lock.Unlock()
+}
+
+func (a *DBGitCredentials) NewQuery() *Query {
+	return newQuery(a)
+}
+
 // archive. It is NOT transactionally save.
 func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 
@@ -97,31 +114,84 @@ func (a *DBGitCredentials) Archive(ctx context.Context, id uint64) error {
 	return nil
 }
 
-// Save (and use database default ID generation)
+// return a map with columnname -> value_from_proto
+func (a *DBGitCredentials) buildSaveMap(ctx context.Context, p *savepb.GitCredentials) (map[string]interface{}, error) {
+	extra, err := extraFieldsToStore(ctx, a, p)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]interface{})
+	res["id"] = a.get_col_from_proto(p, "id")
+	res["userid"] = a.get_col_from_proto(p, "userid")
+	res["host"] = a.get_col_from_proto(p, "host")
+	res["path"] = a.get_col_from_proto(p, "path")
+	res["username"] = a.get_col_from_proto(p, "username")
+	res["password"] = a.get_col_from_proto(p, "password")
+	res["expiry"] = a.get_col_from_proto(p, "expiry")
+	if extra != nil {
+		for k, v := range extra {
+			res[k] = v
+		}
+	}
+	return res, nil
+}
+
 func (a *DBGitCredentials) Save(ctx context.Context, p *savepb.GitCredentials) (uint64, error) {
-	qn := "DBGitCredentials_Save"
-	rows, e := a.DB.QueryContext(ctx, qn, "insert into "+a.SQLTablename+" (userid, host, path, username, password, expiry) values ($1, $2, $3, $4, $5, $6) returning id", a.get_UserID(p), a.get_Host(p), a.get_Path(p), a.get_Username(p), a.get_Password(p), a.get_Expiry(p))
-	if e != nil {
-		return 0, a.Error(ctx, qn, e)
+	qn := "save_DBGitCredentials"
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return 0, err
 	}
-	defer rows.Close()
-	if !rows.Next() {
-		return 0, a.Error(ctx, qn, fmt.Errorf("No rows after insert"))
-	}
-	var id uint64
-	e = rows.Scan(&id)
-	if e != nil {
-		return 0, a.Error(ctx, qn, fmt.Errorf("failed to scan id after insert: %s", e))
-	}
-	p.ID = id
-	return id, nil
+	delete(smap, "id") // save without id
+	return a.saveMap(ctx, qn, smap, p)
 }
 
 // Save using the ID specified
 func (a *DBGitCredentials) SaveWithID(ctx context.Context, p *savepb.GitCredentials) error {
 	qn := "insert_DBGitCredentials"
-	_, e := a.DB.ExecContext(ctx, qn, "insert into "+a.SQLTablename+" (id,userid, host, path, username, password, expiry) values ($1,$2, $3, $4, $5, $6, $7) ", p.ID, p.UserID, p.Host, p.Path, p.Username, p.Password, p.Expiry)
-	return a.Error(ctx, qn, e)
+	smap, err := a.buildSaveMap(ctx, p)
+	if err != nil {
+		return err
+	}
+	_, err = a.saveMap(ctx, qn, smap, p)
+	return err
+}
+
+// use a hashmap of columnname->values to store to database (see buildSaveMap())
+func (a *DBGitCredentials) saveMap(ctx context.Context, queryname string, smap map[string]interface{}, p *savepb.GitCredentials) (uint64, error) {
+	// Save (and use database default ID generation)
+
+	var rows *gosql.Rows
+	var e error
+
+	q_cols := ""
+	q_valnames := ""
+	q_vals := make([]interface{}, 0)
+	deli := ""
+	i := 0
+	// build the 2 parts of the query (column names and value names) as well as the values themselves
+	for colname, val := range smap {
+		q_cols = q_cols + deli + colname
+		i++
+		q_valnames = q_valnames + deli + fmt.Sprintf("$%d", i)
+		q_vals = append(q_vals, val)
+		deli = ","
+	}
+	rows, e = a.DB.QueryContext(ctx, queryname, "insert into "+a.SQLTablename+" ("+q_cols+") values ("+q_valnames+") returning id", q_vals...)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, e)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, a.Error(ctx, queryname, errors.Errorf("No rows after insert"))
+	}
+	var id uint64
+	e = rows.Scan(&id)
+	if e != nil {
+		return 0, a.Error(ctx, queryname, errors.Errorf("failed to scan id after insert: %s", e))
+	}
+	p.ID = id
+	return id, nil
 }
 
 func (a *DBGitCredentials) Update(ctx context.Context, p *savepb.GitCredentials) error {
@@ -141,20 +211,15 @@ func (a *DBGitCredentials) DeleteByID(ctx context.Context, p uint64) error {
 // get it by primary id
 func (a *DBGitCredentials) ByID(ctx context.Context, p uint64) (*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("No GitCredentials with id %v", p))
+		return nil, a.Error(ctx, qn, errors.Errorf("No GitCredentials with id %v", p))
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GitCredentials with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) GitCredentials with id %v", len(l), p))
 	}
 	return l[0], nil
 }
@@ -162,35 +227,35 @@ func (a *DBGitCredentials) ByID(ctx context.Context, p uint64) (*savepb.GitCrede
 // get it by primary id (nil if no such ID row, but no error either)
 func (a *DBGitCredentials) TryByID(ctx context.Context, p uint64) (*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_TryByID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where id = $1", p)
+	l, e := a.fromQuery(ctx, qn, "id = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("TryByID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
 	}
 	if len(l) == 0 {
 		return nil, nil
 	}
 	if len(l) != 1 {
-		return nil, a.Error(ctx, qn, fmt.Errorf("Multiple (%d) GitCredentials with id %v", len(l), p))
+		return nil, a.Error(ctx, qn, errors.Errorf("Multiple (%d) GitCredentials with id %v", len(l), p))
 	}
 	return l[0], nil
+}
+
+// get it by multiple primary ids
+func (a *DBGitCredentials) ByIDs(ctx context.Context, p []uint64) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByIDs"
+	l, e := a.fromQuery(ctx, qn, "id in $1", p)
+	if e != nil {
+		return nil, a.Error(ctx, qn, errors.Errorf("TryByID: error scanning (%s)", e))
+	}
+	return l, nil
 }
 
 // get all rows
 func (a *DBGitCredentials) All(ctx context.Context) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_all"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" order by id")
+	l, e := a.fromQuery(ctx, qn, "true")
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("All: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, fmt.Errorf("All: error scanning (%s)", e)
+		return nil, errors.Errorf("All: error scanning (%s)", e)
 	}
 	return l, nil
 }
@@ -202,14 +267,19 @@ func (a *DBGitCredentials) All(ctx context.Context) ([]*savepb.GitCredentials, e
 // get all "DBGitCredentials" rows with matching UserID
 func (a *DBGitCredentials) ByUserID(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where userid = $1", p)
+	l, e := a.fromQuery(ctx, qn, "userid = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching UserID
+func (a *DBGitCredentials) ByMultiUserID(ctx context.Context, p []string) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByUserID"
+	l, e := a.fromQuery(ctx, qn, "userid in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -217,14 +287,9 @@ func (a *DBGitCredentials) ByUserID(ctx context.Context, p string) ([]*savepb.Gi
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeUserID(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeUserID"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where userid ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "userid ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUserID: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUserID: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -232,14 +297,19 @@ func (a *DBGitCredentials) ByLikeUserID(ctx context.Context, p string) ([]*savep
 // get all "DBGitCredentials" rows with matching Host
 func (a *DBGitCredentials) ByHost(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByHost"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where host = $1", p)
+	l, e := a.fromQuery(ctx, qn, "host = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByHost: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching Host
+func (a *DBGitCredentials) ByMultiHost(ctx context.Context, p []string) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByHost"
+	l, e := a.fromQuery(ctx, qn, "host in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByHost: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -247,14 +317,9 @@ func (a *DBGitCredentials) ByHost(ctx context.Context, p string) ([]*savepb.GitC
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeHost(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeHost"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where host ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "host ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByHost: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByHost: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -262,14 +327,19 @@ func (a *DBGitCredentials) ByLikeHost(ctx context.Context, p string) ([]*savepb.
 // get all "DBGitCredentials" rows with matching Path
 func (a *DBGitCredentials) ByPath(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByPath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where path = $1", p)
+	l, e := a.fromQuery(ctx, qn, "path = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPath: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching Path
+func (a *DBGitCredentials) ByMultiPath(ctx context.Context, p []string) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByPath"
+	l, e := a.fromQuery(ctx, qn, "path in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPath: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -277,14 +347,9 @@ func (a *DBGitCredentials) ByPath(ctx context.Context, p string) ([]*savepb.GitC
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikePath(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikePath"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where path ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "path ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPath: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPath: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -292,14 +357,19 @@ func (a *DBGitCredentials) ByLikePath(ctx context.Context, p string) ([]*savepb.
 // get all "DBGitCredentials" rows with matching Username
 func (a *DBGitCredentials) ByUsername(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByUsername"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where username = $1", p)
+	l, e := a.fromQuery(ctx, qn, "username = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUsername: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching Username
+func (a *DBGitCredentials) ByMultiUsername(ctx context.Context, p []string) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByUsername"
+	l, e := a.fromQuery(ctx, qn, "username in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUsername: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -307,14 +377,9 @@ func (a *DBGitCredentials) ByUsername(ctx context.Context, p string) ([]*savepb.
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeUsername(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeUsername"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where username ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "username ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByUsername: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByUsername: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -322,14 +387,19 @@ func (a *DBGitCredentials) ByLikeUsername(ctx context.Context, p string) ([]*sav
 // get all "DBGitCredentials" rows with matching Password
 func (a *DBGitCredentials) ByPassword(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByPassword"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where password = $1", p)
+	l, e := a.fromQuery(ctx, qn, "password = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPassword: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching Password
+func (a *DBGitCredentials) ByMultiPassword(ctx context.Context, p []string) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByPassword"
+	l, e := a.fromQuery(ctx, qn, "password in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPassword: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -337,14 +407,9 @@ func (a *DBGitCredentials) ByPassword(ctx context.Context, p string) ([]*savepb.
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikePassword(ctx context.Context, p string) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikePassword"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where password ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "password ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByPassword: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByPassword: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -352,14 +417,19 @@ func (a *DBGitCredentials) ByLikePassword(ctx context.Context, p string) ([]*sav
 // get all "DBGitCredentials" rows with matching Expiry
 func (a *DBGitCredentials) ByExpiry(ctx context.Context, p uint32) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByExpiry"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where expiry = $1", p)
+	l, e := a.fromQuery(ctx, qn, "expiry = $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error querying (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByExpiry: error scanning (%s)", e))
 	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
+	return l, nil
+}
+
+// get all "DBGitCredentials" rows with multiple matching Expiry
+func (a *DBGitCredentials) ByMultiExpiry(ctx context.Context, p []uint32) ([]*savepb.GitCredentials, error) {
+	qn := "DBGitCredentials_ByExpiry"
+	l, e := a.fromQuery(ctx, qn, "expiry in $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByExpiry: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -367,14 +437,9 @@ func (a *DBGitCredentials) ByExpiry(ctx context.Context, p uint32) ([]*savepb.Gi
 // the 'like' lookup
 func (a *DBGitCredentials) ByLikeExpiry(ctx context.Context, p uint32) ([]*savepb.GitCredentials, error) {
 	qn := "DBGitCredentials_ByLikeExpiry"
-	rows, e := a.DB.QueryContext(ctx, qn, "select id,userid, host, path, username, password, expiry from "+a.SQLTablename+" where expiry ilike $1", p)
+	l, e := a.fromQuery(ctx, qn, "expiry ilike $1", p)
 	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error querying (%s)", e))
-	}
-	defer rows.Close()
-	l, e := a.FromRows(ctx, rows)
-	if e != nil {
-		return nil, a.Error(ctx, qn, fmt.Errorf("ByExpiry: error scanning (%s)", e))
+		return nil, a.Error(ctx, qn, errors.Errorf("ByExpiry: error scanning (%s)", e))
 	}
 	return l, nil
 }
@@ -383,32 +448,39 @@ func (a *DBGitCredentials) ByLikeExpiry(ctx context.Context, p uint32) ([]*savep
 * The field getters
 **********************************************************************/
 
+// getter for field "ID" (ID) [uint64]
 func (a *DBGitCredentials) get_ID(p *savepb.GitCredentials) uint64 {
-	return p.ID
+	return uint64(p.ID)
 }
 
+// getter for field "UserID" (UserID) [string]
 func (a *DBGitCredentials) get_UserID(p *savepb.GitCredentials) string {
-	return p.UserID
+	return string(p.UserID)
 }
 
+// getter for field "Host" (Host) [string]
 func (a *DBGitCredentials) get_Host(p *savepb.GitCredentials) string {
-	return p.Host
+	return string(p.Host)
 }
 
+// getter for field "Path" (Path) [string]
 func (a *DBGitCredentials) get_Path(p *savepb.GitCredentials) string {
-	return p.Path
+	return string(p.Path)
 }
 
+// getter for field "Username" (Username) [string]
 func (a *DBGitCredentials) get_Username(p *savepb.GitCredentials) string {
-	return p.Username
+	return string(p.Username)
 }
 
+// getter for field "Password" (Password) [string]
 func (a *DBGitCredentials) get_Password(p *savepb.GitCredentials) string {
-	return p.Password
+	return string(p.Password)
 }
 
+// getter for field "Expiry" (Expiry) [uint32]
 func (a *DBGitCredentials) get_Expiry(p *savepb.GitCredentials) uint32 {
-	return p.Expiry
+	return uint32(p.Expiry)
 }
 
 /**********************************************************************
@@ -416,17 +488,91 @@ func (a *DBGitCredentials) get_Expiry(p *savepb.GitCredentials) uint32 {
 **********************************************************************/
 
 // from a query snippet (the part after WHERE)
-func (a *DBGitCredentials) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.GitCredentials, error) {
-	rows, err := a.DB.QueryContext(ctx, "custom_query_"+a.Tablename(), "select "+a.SelectCols()+" from "+a.Tablename()+" where "+query_where, args...)
+func (a *DBGitCredentials) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.GitCredentials, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
 	if err != nil {
 		return nil, err
 	}
-	return a.FromRows(ctx, rows)
+	i := 0
+	for col_name, value := range extra_fields {
+		i++
+		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
+		query.Add(col_name+" = "+efname, QP{efname: value})
+	}
+
+	gw, paras := query.ToPostgres()
+	queryname := "custom_dbquery"
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where "+gw, paras...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+
+}
+
+func (a *DBGitCredentials) FromQuery(ctx context.Context, query_where string, args ...interface{}) ([]*savepb.GitCredentials, error) {
+	return a.fromQuery(ctx, "custom_query_"+a.Tablename(), query_where, args...)
+}
+
+// from a query snippet (the part after WHERE)
+func (a *DBGitCredentials) fromQuery(ctx context.Context, queryname string, query_where string, args ...interface{}) ([]*savepb.GitCredentials, error) {
+	extra_fields, err := extraFieldsToQuery(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	eq := ""
+	if extra_fields != nil && len(extra_fields) > 0 {
+		eq = " AND ("
+		// build the extraquery "eq"
+		i := len(args)
+		deli := ""
+		for col_name, value := range extra_fields {
+			i++
+			eq = eq + deli + col_name + fmt.Sprintf(" = $%d", i)
+			deli = " AND "
+			args = append(args, value)
+		}
+		eq = eq + ")"
+	}
+	rows, err := a.DB.QueryContext(ctx, queryname, "select "+a.SelectCols()+" from "+a.Tablename()+" where ( "+query_where+") "+eq, args...)
+	if err != nil {
+		return nil, err
+	}
+	res, err := a.FromRows(ctx, rows)
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 /**********************************************************************
 * Helper to convert from an SQL Row to struct
 **********************************************************************/
+func (a *DBGitCredentials) get_col_from_proto(p *savepb.GitCredentials, colname string) interface{} {
+	if colname == "id" {
+		return a.get_ID(p)
+	} else if colname == "userid" {
+		return a.get_UserID(p)
+	} else if colname == "host" {
+		return a.get_Host(p)
+	} else if colname == "path" {
+		return a.get_Path(p)
+	} else if colname == "username" {
+		return a.get_Username(p)
+	} else if colname == "password" {
+		return a.get_Password(p)
+	} else if colname == "expiry" {
+		return a.get_Expiry(p)
+	}
+	panic(fmt.Sprintf("in table \"%s\", column \"%s\" cannot be resolved to proto field name", a.Tablename(), colname))
+}
+
 func (a *DBGitCredentials) Tablename() string {
 	return a.SQLTablename
 }
@@ -438,18 +584,6 @@ func (a *DBGitCredentials) SelectColsQualified() string {
 	return "" + a.SQLTablename + ".id," + a.SQLTablename + ".userid, " + a.SQLTablename + ".host, " + a.SQLTablename + ".path, " + a.SQLTablename + ".username, " + a.SQLTablename + ".password, " + a.SQLTablename + ".expiry"
 }
 
-func (a *DBGitCredentials) FromRowsOld(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
-	var res []*savepb.GitCredentials
-	for rows.Next() {
-		foo := savepb.GitCredentials{}
-		err := rows.Scan(&foo.ID, &foo.UserID, &foo.Host, &foo.Path, &foo.Username, &foo.Password, &foo.Expiry)
-		if err != nil {
-			return nil, a.Error(ctx, "fromrow-scan", err)
-		}
-		res = append(res, &foo)
-	}
-	return res, nil
-}
 func (a *DBGitCredentials) FromRows(ctx context.Context, rows *gosql.Rows) ([]*savepb.GitCredentials, error) {
 	var res []*savepb.GitCredentials
 	for rows.Next() {
@@ -525,6 +659,6 @@ func (a *DBGitCredentials) Error(ctx context.Context, q string, e error) error {
 	if e == nil {
 		return nil
 	}
-	return fmt.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
+	return errors.Errorf("[table="+a.SQLTablename+", query=%s] Error: %s", q, e)
 }
 

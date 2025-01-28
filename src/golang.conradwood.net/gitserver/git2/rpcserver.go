@@ -38,6 +38,7 @@ type GIT2 struct {
 }
 
 func (g *GIT2) init() error {
+	db.DefaultDBNRepoTagID()
 	g.url_store = db.DefaultDBSourceRepositoryURL()
 	g.repo_store = db.DefaultDBSourceRepository()
 	g.repocreatelog_store = db.DefaultDBCreateRepoLog()
@@ -76,7 +77,7 @@ func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Sou
 		}
 		if ol == nil {
 			fmt.Printf("for a weird reason we did not get a permissions object but no error either")
-			return nil, fmt.Errorf("permission error")
+			return nil, errors.Errorf("permission error")
 		}
 		if ol.Permissions == nil {
 			return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", req.ID)
@@ -427,7 +428,7 @@ func (g *GIT2) ResetRepository(ctx context.Context, req *gitpb.ByIDRequest) (*co
 	body := string(hb.Body())
 	if !strings.Contains(body, r) {
 		fmt.Printf("Did not reset repo at %s: (%s)\n", url, body)
-		return nil, fmt.Errorf("failed to recreate: not a gitserver reply")
+		return nil, errors.Errorf("failed to recreate: not a gitserver reply")
 	}
 	fmt.Printf("Resetted repo at %s\n", url)
 	return &common.Void{}, nil
@@ -495,7 +496,7 @@ func (g *GIT2) GetRecentBuilds(ctx context.Context, req *gitpb.ByIDRequest) (*gi
 	}
 	if ol == nil {
 		fmt.Printf("for a weird reason we did not get a permissions object but no error either")
-		return nil, fmt.Errorf("permission error")
+		return nil, errors.Errorf("permission error")
 	}
 	if ol.Permissions == nil {
 		return nil, errors.AccessDenied(ctx, "access denied to git repository %d (no permission)", req.ID)
@@ -530,7 +531,7 @@ func checkValidHost(ctx context.Context, host string) error {
 func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookServer) error {
 	ld := crossprocdata.GetLocalData(req.RequestKey)
 	if ld == nil {
-		return fmt.Errorf("attempt to invoke hook failed, invalid or missing requestkey from gitprocess")
+		return errors.Errorf("attempt to invoke hook failed, invalid or missing requestkey from gitprocess")
 	}
 	hr := ld.HTTPRequest.(*HTTPRequest)
 	ctx := srv.Context()
@@ -540,7 +541,7 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 	if req.HookName == "update" {
 		err = ch.OnUpdate(srv)
 	} else {
-		err = fmt.Errorf("unknown hook \"%s\"", req.HookName)
+		err = errors.Errorf("unknown hook \"%s\"", req.HookName)
 	}
 	if err != nil {
 		fmt.Printf("Hook \"%s\" failed: %s\n", req.HookName, err)
@@ -556,7 +557,14 @@ func (g *GIT2) GetLatestSuccessfulBuild(ctx context.Context, req *gitpb.ByIDRequ
 	if err != nil {
 		return nil, err
 	}
-	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 and success = true order by id desc limit 1", req.ID)
+	//	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 and success = true order by id desc limit 1", req.ID)
+	q := g.build_store.NewQuery()
+	q.AddEqual("repositoryid", req.ID)
+	q.AddEqual("success", true)
+	q.Limit(1)
+	q.OrderBy("id desc")
+	builds, err := g.build_store.ByDBQuery(ctx, q)
+
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +580,12 @@ func (g *GIT2) GetLatestBuild(ctx context.Context, req *gitpb.ByIDRequest) (*git
 		return nil, err
 	}
 
-	builds, err := g.build_store.FromQuery(ctx, " repositoryid=$1 order by id desc limit 1", req.ID)
+	q := g.build_store.NewQuery()
+	q.AddEqual("repositoryid", req.ID)
+	q.Limit(1)
+	q.OrderBy("id desc")
+	builds, err := g.build_store.ByDBQuery(ctx, q)
+	//	ctx, " repositoryid=$1 order by id desc limit 1", req.ID)
 	if err != nil {
 		return nil, err
 	}
