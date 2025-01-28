@@ -297,6 +297,27 @@ message NumberCommitsUserRequest {
 message NumberCommitsUserResponse {
   uint32 Commits=1;
 }
+
+
+message GetNTagRequest {
+  uint64 RepositoryID=1;
+  uint64 Tag=2;
+}
+message AttachNTagRequest {
+  uint64 RepositoryID=1;
+  uint64 Tag=2;
+  uint64 BuildID=3;
+}
+
+message NRepoTagID {
+  uint64 ID=1;
+  uint64 RepositoryID=2;
+  uint64 Tag=3;
+  uint64 BuildID=4;
+}
+message NTagResponse {
+  NRepoTagID NTag=1; // might be nil if tag is not available
+}
 /*
  a new implementation of git server
  Major Differences to GIT1:
@@ -358,7 +379,13 @@ service GIT2 {
   // this answers the question: "How many commits did User push before time X?"
   // note the absense of a repository - this queries across all repositories, including deleted ones.
   rpc GetNumberCommitsUser(NumberCommitsUserRequest) returns (NumberCommitsUserResponse);
+  // rpc attach an N-tag (a number) to a build (n-tags are distinct from any other tags).
+  // An N-Tag is a numeric tag. Each repository may only have at most 1 n-tag for each numeric value
+  rpc AttachNTagToBuild(AttachNTagRequest)returns(common.Void);
+  // rpc get build for n-tag
+  rpc GetBuildWithNTag(GetNTagRequest)returns(NTagResponse);
 }
+
 
 /*********************************
 git credentials
