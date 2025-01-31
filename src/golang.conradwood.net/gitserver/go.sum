@@ -94,8 +94,8 @@ golang.conradwood.net/apis/registry v1.1.3603 h1:c+Y0kNCW9I6Z15x0Ao55X8n5oCQVUUX
 golang.conradwood.net/apis/registry v1.1.3603/go.mod h1:kyNv4NpKH/79ZothZo5KM9ntBr2fhpJiWFG1/mPseCQ=
 golang.conradwood.net/apis/slackgateway v1.1.3603 h1:ZzkamNANAt7M09HSVLUvko9yvs+ouYBPfU1ZOa2X5Jc=
 golang.conradwood.net/apis/slackgateway v1.1.3603/go.mod h1:h7a+NZbwy1hmS9FV1svLl8iVlPCe3WRcpcm5xUUo8VQ=
-golang.conradwood.net/go-easyops v0.1.33474 h1:H4K2kSSnHItCgLYn8u1tv5l0lmrs/BFhk926j3osf70=
-golang.conradwood.net/go-easyops v0.1.33474/go.mod h1:6Y6yEXGCb52YiadMEySrZ0rcb6DH0YnfBYQPW3SS8sc=
+golang.conradwood.net/go-easyops v0.1.33605 h1:rkeFKxXbh4AAuC5rbY4JQbjGXfItsm3OdYv773gqggE=
+golang.conradwood.net/go-easyops v0.1.33605/go.mod h1:6Y6yEXGCb52YiadMEySrZ0rcb6DH0YnfBYQPW3SS8sc=
 golang.org/x/net v0.34.0 h1:Mb7Mrk043xzHgnRM88suvJFwzVrRfHEHJEl5/71CKw0=
 golang.org/x/net v0.34.0/go.mod h1:di0qlW3YNM5oh6GqDGQr92MyTozJPmybPK4Ev/Gm31k=
 golang.org/x/sys v0.29.0 h1:TPYlXGxvx1MGTn2GiZDhnjPA9wZzZeGKHHmKhHYvgaU=
