@@ -20,6 +20,7 @@ var (
 
 func main() {
 	flag.Parse()
+   server.SetHealth(common.Health_STARTING)
 	go cleaner_loop()
 	var err error
 	//	psql, err := sql.Open()
@@ -28,6 +29,7 @@ func main() {
 	cserver := &CServer{}
 	sd := server.NewServerDef()
 	sd.SetPort(*grpc_port)
+sd.SetOnStartupCallback(startup)
 	sd.SetRegister(server.Register(func(server *grpc.Server) error {
 		gitpb.RegisterGITCredentialsServer(server, cserver)
 		return nil
@@ -36,6 +38,10 @@ func main() {
 	utils.Bail("failed to start git credentials grpc server", err)
 
 }
+func startup() {
+	server.SetHealth(common.Health_READY)
+}
+
 
 type CServer struct {
 }
@@ -87,6 +93,8 @@ func (c *CServer) GitInvoked(ctx context.Context, req *gitpb.GitCredentialsReque
 	}
 	return res, nil
 }
+
+
 
 
 
