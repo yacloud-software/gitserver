@@ -2,14 +2,16 @@ package git2
 
 import (
 	"fmt"
+	"os"
+	"time"
+
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/apis/objectauth"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/linux"
 	"golang.conradwood.net/go-easyops/utils"
-	"os"
-	"time"
 )
 
 const (
@@ -89,6 +91,19 @@ func (h *HTTPRequest) CreateRepo() {
 		}
 	}
 
+	oreq := &objectauth.GrantUserRequest{
+		ObjectType: objectauth.OBJECTTYPE_GitRepository,
+		ObjectID:   crp.RepositoryID,
+		UserID:     crp.UserID,
+		Read:       true,
+		Write:      true,
+		Execute:    true,
+		View:       true,
+	}
+	_, err = objectauth.GetObjectAuthClient().GrantToUser(ctx, oreq)
+	if err != nil {
+		fmt.Printf("Failed to auth: %s\n", errors.ErrorString(err))
+	}
 	h.w.Write([]byte("Repository created\n"))
 	fmt.Printf("Repository created.\n")
 }
@@ -172,6 +187,3 @@ func (h *HTTPRequest) GetCreateLog() (*gitpb.CreateRepoLog, error) {
 	crp := crpx[0]
 	return crp, nil
 }
-
-
-
