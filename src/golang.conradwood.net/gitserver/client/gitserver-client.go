@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"sort"
 
 	"golang.conradwood.net/apis/common"
 	pb "golang.conradwood.net/apis/gitserver"
@@ -20,7 +21,13 @@ import (
 	"golang.conradwood.net/go-easyops/utils"
 )
 
+const (
+	FORMAT_HUMAN = 1
+	FORMAT_SHELL = 2
+)
+
 var (
+	format      = flag.String("of", "human", "output format. [human|bash]")
 	githost     = flag.String("githost", "git.conradwood.net", "default git host for create")
 	exc         = flag.String("exc_scripts", "", "comma delimeted list of scripts to be excluded from run. passed on to gitbuilder. typically 'DIST'")
 	latest      = flag.Bool("latest", false, "get latest build of current repo")
@@ -110,6 +117,7 @@ func main() {
 	}
 	if *getrepo {
 		showrepo()
+		os.Exit(0)
 	}
 	fmt.Printf("Done.\n")
 	os.Exit(0)
@@ -125,26 +133,49 @@ func showrepo() {
 		afs = fmt.Sprintf("%d", af)
 	}
 	rid := &pb.ByIDRequest{ID: rl.ID}
-	fmt.Printf("RepositoryID  : %d\n", rl.ID)
-	fmt.Printf("ArtefactID    : %s\n", afs)
-	fmt.Printf("Artefact      : %s\n", rl.ArtefactName)
-	fmt.Printf("Last Commit   : %s\n", utils.TimestampString(rl.LastCommit))
-	fmt.Printf("Last Committer: %s\n", rl.LastCommitUser)
-	for _, u := range rl.URLs {
-		url := fmt.Sprintf("https://%s/git/%s", u.Host, u.Path)
-		fmt.Printf("URL: %s\n", url)
-	}
-	b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
-	utils.Bail("did not get latest build", err)
-	bs, err := pb.GetGIT2Client().GetLatestSuccessfulBuild(ctx, rid)
-	utils.Bail("did not get latest build", err)
+	if Format() == FORMAT_HUMAN {
+		fmt.Printf("RepositoryID  : %d\n", rl.ID)
+		fmt.Printf("ArtefactID    : %s\n", afs)
+		fmt.Printf("Artefact      : %s\n", rl.ArtefactName)
+		fmt.Printf("Last Commit   : %s\n", utils.TimestampString(rl.LastCommit))
+		fmt.Printf("Last Committer: %s\n", rl.LastCommitUser)
+		for _, u := range rl.URLs {
+			url := fmt.Sprintf("https://%s/git/%s", u.Host, u.Path)
+			fmt.Printf("URL: %s\n", url)
+		}
+		b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
+		utils.Bail("did not get latest build", err)
+		bs, err := pb.GetGIT2Client().GetLatestSuccessfulBuild(ctx, rid)
+		utils.Bail("did not get latest build", err)
 
-	s := fmt.Sprintf("%d", b.ID)
-	if bs.ID != b.ID {
-		s = fmt.Sprintf("%d (last successful build: %d)", b.ID, bs.ID)
+		s := fmt.Sprintf("%d", b.ID)
+		if bs.ID != b.ID {
+			s = fmt.Sprintf("%d (last successful build: %d)", b.ID, bs.ID)
+		}
+		fmt.Printf("Latest Build  : %s\n", s)
+	} else if Format() == FORMAT_SHELL {
+		b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
+		utils.Bail("did not get latest build", err)
+		bs, err := pb.GetGIT2Client().GetLatestSuccessfulBuild(ctx, rid)
+		utils.Bail("did not get latest build", err)
+		fmt.Printf("GITSERVER_REPOSITORYID=%d\n", rl.ID)
+		fmt.Printf("GITSERVER_ARTEFACTID=%s\n", afs)
+		fmt.Printf("GITSERVER_ARTEFACT=%s\n", rl.ArtefactName)
+		fmt.Printf("GITSERVER_LAST_COMMIT=%s\n", utils.TimestampString(rl.LastCommit))
+		fmt.Printf("GITSERVER_LAST_COMMITTER=%s\n", rl.LastCommitUser)
+		sort.Slice(rl.URLs, func(i, j int) bool {
+			s1 := rl.URLs[i].Host + rl.URLs[i].Path
+			s2 := rl.URLs[j].Host + rl.URLs[j].Path
+			return s1 < s2
+		})
+		u := ""
+		if len(rl.URLs) > 0 {
+			u = rl.URLs[0].Host + "/" + rl.URLs[0].Path
+		}
+		fmt.Printf("GITSERVER_URL=\"%s\"\n", u)
+		fmt.Printf("GITSERVER_LATEST_BUILD=%d\n", b.ID)
+		fmt.Printf("GITSERVER_LATEST_SUCCESSFUL_BUILD=%d\n", bs.ID)
 	}
-	fmt.Printf("Latest Build  : %s\n", s)
-
 }
 
 func Delete() {
@@ -324,4 +355,14 @@ func SetTag() error {
 	}
 	fmt.Printf("Attached tag %d in repo %d to build %d\n", nreq.Tag, nreq.RepositoryID, nreq.BuildID)
 	return nil
+}
+func Format() int {
+	f := *format
+	if f == "human" {
+		return FORMAT_HUMAN
+	} else if f == "shell" {
+		return FORMAT_SHELL
+	} else {
+		panic(fmt.Sprintf("\"%s\" is not a valid format", f))
+	}
 }

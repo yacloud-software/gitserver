@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/utils"
-	"os"
-	"path/filepath"
 )
 
 func GetRepository(ctx context.Context) *pb.SourceRepository {
@@ -21,11 +22,18 @@ func GetRepository(ctx context.Context) *pb.SourceRepository {
 	}
 	tr, err := findGitTopDir()
 	utils.Bail("failed to find .git in repo", err)
-	fmt.Printf("Repository root: %s\n", tr)
 	gc, err := ParseGitConfig(tr + "/.git/config")
 	utils.Bail("failed to parse git config", err)
 	url := gc.GetEntry(`remote "origin"`, "url")
-	fmt.Printf("URL: \"%s\"\n", url)
+	if Format() == FORMAT_HUMAN {
+		fmt.Printf("Repository root: %s\n", tr)
+		fmt.Printf("URL            : \"%s\"\n", url)
+	} else if Format() == FORMAT_SHELL {
+		fmt.Printf("GITSERVER_REPOSITORY_ROOT=%s\n", tr)
+		fmt.Printf("GITSERVER_REPOSITORY_URL=%s\n", url)
+	} else {
+		panic("inv format")
+	}
 	if *debug {
 		for _, s := range gc.Sections {
 			fmt.Printf("Section: \"%s\"\n", s.Name)
@@ -75,6 +83,3 @@ func traverseToTopOfRepo(dir string) (string, error) {
 	}
 	return traverseToTopOfRepo(l)
 }
-
-
-
