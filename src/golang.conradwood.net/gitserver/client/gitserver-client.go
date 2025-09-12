@@ -170,10 +170,13 @@ func showrepo() {
 			return s1 < s2
 		})
 		u := ""
+		url_host := ""
 		if len(rl.URLs) > 0 {
+			url_host = rl.URLs[0].Host
 			u = rl.URLs[0].Host + "/" + rl.URLs[0].Path
 		}
-		fmt.Printf("GITSERVER_URL=\"%s\"\n", u)
+		fmt.Printf("GITSERVER_URL=\"https://%s\"\n", u)
+		fmt.Printf("GITSERVER_URL_HOST=\"%s\"\n", url_host)
 		fmt.Printf("GITSERVER_LATEST_BUILD=%d\n", b.ID)
 		fmt.Printf("GITSERVER_LATEST_SUCCESSFUL_BUILD=%d\n", bs.ID)
 	}
@@ -203,8 +206,15 @@ func Fork() {
 	}
 	rl, err := pb.GetGIT2Client().Fork(ctx, fr)
 	utils.Bail("Failed to fork()", err)
-	fmt.Printf("Forked into #%d\n", rl.ID)
-	fmt.Printf("Served at https://%s/git/%s\n", rl.URLs[0].Host, rl.URLs[0].Path)
+	if Format() == FORMAT_HUMAN {
+		fmt.Printf("Forked into #%d\n", rl.ID)
+		fmt.Printf("Served at https://%s/git/%s\n", rl.URLs[0].Host, rl.URLs[0].Path)
+	} else if Format() == FORMAT_SHELL {
+		fmt.Printf("GITSERVER_NEW_REPOSITORYID=%d\n", rl.ID)
+		fmt.Printf("GITSERVER_NEW_URL=\"https://%s/git/%s\"\n", rl.URLs[0].Host, rl.URLs[0].Path)
+	} else {
+		panic("inv format")
+	}
 }
 func Create() {
 	ctx := authremote.Context()
