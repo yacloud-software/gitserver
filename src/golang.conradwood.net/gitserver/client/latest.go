@@ -30,7 +30,7 @@ func GetRepository(ctx context.Context) *pb.SourceRepository {
 		fmt.Printf("URL            : \"%s\"\n", url)
 	} else if Format() == FORMAT_SHELL {
 		fmt.Printf("GITSERVER_REPOSITORY_ROOT=%s\n", tr)
-		fmt.Printf("GITSERVER_REPOSITORY_URL=%s\n", url)
+		fmt.Printf("GITSERVER_REPOSITORY_URL=\"%s\"\n", url)
 	} else {
 		panic("inv format")
 	}

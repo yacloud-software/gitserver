@@ -134,14 +134,14 @@ func showrepo() {
 	}
 	rid := &pb.ByIDRequest{ID: rl.ID}
 	if Format() == FORMAT_HUMAN {
-		fmt.Printf("RepositoryID  : %d\n", rl.ID)
-		fmt.Printf("ArtefactID    : %s\n", afs)
-		fmt.Printf("Artefact      : %s\n", rl.ArtefactName)
-		fmt.Printf("Last Commit   : %s\n", utils.TimestampString(rl.LastCommit))
-		fmt.Printf("Last Committer: %s\n", rl.LastCommitUser)
+		fmt.Printf("RepositoryID   : %d\n", rl.ID)
+		fmt.Printf("ArtefactID     : %s\n", afs)
+		fmt.Printf("Artefact       : %s\n", rl.ArtefactName)
+		fmt.Printf("Last Commit    : %s\n", utils.TimestampString(rl.LastCommit))
+		fmt.Printf("Last Committer : %s\n", rl.LastCommitUser)
 		for _, u := range rl.URLs {
 			url := fmt.Sprintf("https://%s/git/%s", u.Host, u.Path)
-			fmt.Printf("URL: %s\n", url)
+			fmt.Printf("URL            : %s\n", url)
 		}
 		b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
 		utils.Bail("did not get latest build", err)
@@ -152,7 +152,7 @@ func showrepo() {
 		if bs.ID != b.ID {
 			s = fmt.Sprintf("%d (last successful build: %d)", b.ID, bs.ID)
 		}
-		fmt.Printf("Latest Build  : %s\n", s)
+		fmt.Printf("Latest Build   : %s\n", s)
 	} else if Format() == FORMAT_SHELL {
 		b, err := pb.GetGIT2Client().GetLatestBuild(ctx, rid)
 		utils.Bail("did not get latest build", err)
@@ -161,7 +161,8 @@ func showrepo() {
 		fmt.Printf("GITSERVER_REPOSITORYID=%d\n", rl.ID)
 		fmt.Printf("GITSERVER_ARTEFACTID=%s\n", afs)
 		fmt.Printf("GITSERVER_ARTEFACT=%s\n", rl.ArtefactName)
-		fmt.Printf("GITSERVER_LAST_COMMIT=%s\n", utils.TimestampString(rl.LastCommit))
+		fmt.Printf("GITSERVER_LAST_COMMIT=%d\n", rl.LastCommit)
+		fmt.Printf("GITSERVER_LAST_COMMIT_STRING=\"%s\"\n", utils.TimestampString(rl.LastCommit))
 		fmt.Printf("GITSERVER_LAST_COMMITTER=%s\n", rl.LastCommitUser)
 		sort.Slice(rl.URLs, func(i, j int) bool {
 			s1 := rl.URLs[i].Host + rl.URLs[i].Path
