@@ -6,9 +6,9 @@ toolchain go1.23.3
 
 require (
 	golang.conradwood.net/apis/artefact v1.1.4021
-	golang.conradwood.net/apis/auth v1.1.4055
+	golang.conradwood.net/apis/auth v1.1.4059
 	golang.conradwood.net/apis/buildrepo v1.1.4021
-	golang.conradwood.net/apis/common v1.1.4055
+	golang.conradwood.net/apis/common v1.1.4059
 	golang.conradwood.net/apis/gitbuilder v1.1.4021
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.4021

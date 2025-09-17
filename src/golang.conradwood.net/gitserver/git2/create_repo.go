@@ -6,7 +6,7 @@ import (
 	"time"
 
 	gitpb "golang.conradwood.net/apis/gitserver"
-	"golang.conradwood.net/apis/objectauth"
+	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/go-easyops/auth"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
@@ -42,7 +42,7 @@ func (h *HTTPRequest) RecreateRepo() {
 	h.repo = &Repo{gitrepo: repo}
 	td := h.repo.AbsDirectory()
 	os.RemoveAll(td)
-	_, err = h.CreateRepoWithError(false)
+	_, _, err = h.CreateRepoWithError(false)
 	if err != nil {
 		fmt.Printf("Failed to create repo: %s\n", err)
 		h.Error(err)
@@ -61,7 +61,7 @@ func (h *HTTPRequest) RecreateRepo() {
 
 }
 func (h *HTTPRequest) CreateRepo() {
-	crp, err := h.CreateRepoWithError(true)
+	crp, _, err := h.CreateRepoWithError(true)
 	ctx := authremote.Context()
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
@@ -90,43 +90,20 @@ func (h *HTTPRequest) CreateRepo() {
 			return
 		}
 	}
-	userids := []string{crp.UserID}
-	if crp.UserID == "1" {
-		userids = append(userids, "7") // add singingcat
-	}
-	if crp.UserID == "7" {
-		userids = append(userids, "1") // add cnw
-	}
-	for _, userid := range userids {
-		fmt.Printf("Granting access to user id %s\n", userid)
-		oreq := &objectauth.GrantUserRequest{
-			ObjectType: objectauth.OBJECTTYPE_GitRepository,
-			ObjectID:   crp.RepositoryID,
-			UserID:     userid,
-			Read:       true,
-			Write:      true,
-			Execute:    true,
-			View:       true,
-		}
-		_, err = objectauth.GetObjectAuthClient().GrantToUser(ctx, oreq)
-		if err != nil {
-			fmt.Printf("Failed to grant access to repo %d to user %s: %s\n", crp.RepositoryID, userid, errors.ErrorString(err))
-		} else {
-			fmt.Printf("Objectauth granted access to repo #%d to user %s\n", crp.RepositoryID, userid)
-		}
-	}
+
 	h.w.Write([]byte("Repository created\n"))
+
 	fmt.Printf("Repository created.\n")
 }
-func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLog, error) {
+func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLog, *pb.SourceRepository, error) {
 	fmt.Printf("Creating repository %s\n", h.gurl.RepoPath())
 	crp, err := h.GetCreateLog()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if crp.Success {
 		fmt.Printf("Already processed CreateRepoLog #%d successfully\n", crp.ID)
-		return crp, nil
+		return crp, nil, nil
 	}
 	fmt.Printf("Creating Repository %d\n", crp.RepositoryID)
 	ctx, err := auth.RecreateContextWithTimeout(time.Duration(5)*time.Minute, []byte(crp.Context))
@@ -134,25 +111,25 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 		utils.PrintStack("invalid context")
 		fmt.Println(utils.Hexdump("context", []byte(crp.Context)))
 		fmt.Printf("Context is not valid: %s\n", err)
-		return crp, err
+		return crp, nil, err
 	}
 	h.user = auth.GetUser(ctx)
 
 	if h.user == nil && requireUser {
 		fmt.Printf("No user in deserialised context!")
-		return crp, fmt.Errorf("invalid unauthenticated request")
+		return crp, nil, fmt.Errorf("invalid unauthenticated request")
 	}
 
 	repo, err := h.git2.repo_store.ByID(ctx, crp.RepositoryID)
 	if err != nil {
 		fmt.Printf("failed to load repository: %s\n", err)
-		return crp, err
+		return crp, nil, err
 	}
 	h.repo = &Repo{gitrepo: repo}
 	td := h.repo.AbsDirectory()
 	if utils.FileExists(td + "/config") {
 		fmt.Printf("There is already a repository at %s\n", td)
-		return crp, fmt.Errorf("repository exists already")
+		return crp, nil, fmt.Errorf("repository exists already")
 	}
 	fmt.Printf("Need to create repo at: %s\n", td)
 	os.MkdirAll(td, 0777)
@@ -160,7 +137,7 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 		src, err := h.git2.repo_store.ByID(ctx, repo.ForkedFrom)
 		if err != nil {
 			fmt.Printf("failed to load source repository: %s\n", err)
-			return crp, err
+			return crp, nil, err
 		}
 		fmt.Printf("Copying \"%s\" source...\n", src)
 		copyrepo(src, h.repo.gitrepo)
@@ -170,11 +147,11 @@ func (h *HTTPRequest) CreateRepoWithError(requireUser bool) (*gitpb.CreateRepoLo
 		out, err := l.SafelyExecuteWithDir([]string{"git", "--bare", "init"}, td, nil)
 		if err != nil {
 			fmt.Printf("git bare init failed: %s\n", out)
-			return nil, fmt.Errorf("failed to init git repository")
+			return nil, nil, fmt.Errorf("failed to init git repository")
 		}
 	}
 	fmt.Printf("Repo created\n")
-	return crp, nil
+	return crp, repo, nil
 }
 
 // load the createlog from url/headers

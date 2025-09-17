@@ -10,6 +10,7 @@ import (
 
 	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/apis/objectauth"
 	oa "golang.conradwood.net/apis/objectauth"
 	"golang.conradwood.net/gitserver/checks"
 	"golang.conradwood.net/gitserver/crossprocdata"
@@ -268,6 +269,47 @@ func (g *GIT2) CreateRepo(ctx context.Context, req *gitpb.CreateRepoRequest) (*g
 	if err != nil {
 		fmt.Printf("HTTP-Create request failed: %s\n", utils.ErrorString(err))
 		return nil, err
+	}
+
+	userids := []string{crl.UserID}
+	if crl.UserID == "1" {
+		userids = append(userids, "7") // add singingcat
+	}
+	if crl.UserID == "7" {
+		userids = append(userids, "1") // add cnw
+	}
+	for _, userid := range userids {
+		fmt.Printf("Granting access to user id %s\n", userid)
+		oreq := &objectauth.GrantUserRequest{
+			ObjectType: objectauth.OBJECTTYPE_GitRepository,
+			ObjectID:   crl.RepositoryID,
+			UserID:     userid,
+			Read:       true,
+			Write:      true,
+			Execute:    true,
+			View:       true,
+		}
+		_, err = objectauth.GetObjectAuthClient().GrantToUser(ctx, oreq)
+		if err != nil {
+			fmt.Printf("Failed to grant access to repo %d to user %s: %s\n", crl.RepositoryID, userid, errors.ErrorString(err))
+		} else {
+			fmt.Printf("Objectauth granted access to repo #%d to user %s\n", crl.RepositoryID, userid)
+		}
+	}
+
+	if req.CompleteForAccess {
+		sr.RunPostReceive = true
+		sr.RunPreReceive = true
+		sr.CreatedComplete = true
+		sr.Deleted = false
+		sr.Forking = false
+		sr.ReadOnly = false
+		sr.DenyMessage = ""
+		err = db.DefaultDBSourceRepository().Update(ctx, sr)
+		if err != nil {
+			fmt.Printf("Failed to update: %s\n", errors.ErrorString(err))
+			return nil, err
+		}
 	}
 	return sr, nil
 }
