@@ -162,6 +162,7 @@ message CreateRepoRequest {
   string ArtefactName = 1;
   SourceRepositoryURL URL = 2; // at least one is required
   string Description = 3;      // a description for this repository
+  bool CompleteForAccess=4; // if true, mark it as complete. if it is false, access will be read-only and limited to repobuilder until that says it is done. So for fork() and for repobuilder we need this to be false, otherwise for straight create it should be true
 }
 
 // stored in database. Maps a URL to a filepath and a unique ID
