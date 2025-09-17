@@ -305,6 +305,9 @@ func (g *GIT2) CreateRepo(ctx context.Context, req *gitpb.CreateRepoRequest) (*g
 		sr.Forking = false
 		sr.ReadOnly = false
 		sr.DenyMessage = ""
+		if sr.CreateUser == "" {
+			sr.CreateUser = u.ID
+		}
 		err = db.DefaultDBSourceRepository().Update(ctx, sr)
 		if err != nil {
 			fmt.Printf("Failed to update: %s\n", errors.ErrorString(err))
