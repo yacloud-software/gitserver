@@ -90,19 +90,30 @@ func (h *HTTPRequest) CreateRepo() {
 			return
 		}
 	}
-
-	oreq := &objectauth.GrantUserRequest{
-		ObjectType: objectauth.OBJECTTYPE_GitRepository,
-		ObjectID:   crp.RepositoryID,
-		UserID:     crp.UserID,
-		Read:       true,
-		Write:      true,
-		Execute:    true,
-		View:       true,
+	userids := []string{crp.UserID}
+	if crp.UserID == "1" {
+		userids = append(userids, "7") // add singingcat
 	}
-	_, err = objectauth.GetObjectAuthClient().GrantToUser(ctx, oreq)
-	if err != nil {
-		fmt.Printf("Failed to auth: %s\n", errors.ErrorString(err))
+	if crp.UserID == "7" {
+		userids = append(userids, "1") // add cnw
+	}
+	for _, userid := range userids {
+		fmt.Printf("Granting access to user id %s\n", userid)
+		oreq := &objectauth.GrantUserRequest{
+			ObjectType: objectauth.OBJECTTYPE_GitRepository,
+			ObjectID:   crp.RepositoryID,
+			UserID:     userid,
+			Read:       true,
+			Write:      true,
+			Execute:    true,
+			View:       true,
+		}
+		_, err = objectauth.GetObjectAuthClient().GrantToUser(ctx, oreq)
+		if err != nil {
+			fmt.Printf("Failed to grant access to repo %d to user %s: %s\n", crp.RepositoryID, userid, errors.ErrorString(err))
+		} else {
+			fmt.Printf("Objectauth granted access to repo #%d to user %s\n", crp.RepositoryID, userid)
+		}
 	}
 	h.w.Write([]byte("Repository created\n"))
 	fmt.Printf("Repository created.\n")
