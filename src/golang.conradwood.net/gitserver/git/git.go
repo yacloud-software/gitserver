@@ -4,13 +4,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"golang.conradwood.net/go-easyops/linux"
-	"golang.conradwood.net/go-easyops/utils"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.conradwood.net/go-easyops/linux"
+	"golang.conradwood.net/go-easyops/utils"
 )
 
 var (
@@ -150,17 +151,21 @@ func (g *Git) Checkout(ctx context.Context, ref string, commit string) error {
 			g.LogMessage = strings.Join(sep[i+1:], "\n")
 			g.LogMessage = strings.TrimSuffix(g.LogMessage, "\n")
 			g.LogMessage = strings.TrimSpace(g.LogMessage)
-			fmt.Printf("Logmessage: \"%s\"\n", g.LogMessage)
 			break
 		}
 		//fmt.Printf("%d. \"%s\"\n", i, l)
 	}
-
+	if g.LogMessage == "" {
+		if len(gitlog) > 3 {
+			if len(gitlog) > 512 {
+				gitlog = gitlog[:511]
+			}
+			g.LogMessage = gitlog
+		}
+	}
+	fmt.Printf("Logmessage: \"%s\"\n", g.LogMessage)
 	g.broken = false
 	g.checkedout = commit
 
 	return nil
 }
-
-
-
