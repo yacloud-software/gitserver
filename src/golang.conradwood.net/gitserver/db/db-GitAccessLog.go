@@ -53,6 +53,12 @@ type DBGitAccessLog struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBGitAccessLog()
+	})
+}
+
 func DefaultDBGitAccessLog() *DBGitAccessLog {
 	if default_def_DBGitAccessLog != nil {
 		return default_def_DBGitAccessLog
@@ -190,6 +196,14 @@ func (a *DBGitAccessLog) saveMap(ctx context.Context, queryname string, smap map
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBGitAccessLog) SaveOrUpdate(ctx context.Context, p *savepb.GitAccessLog) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBGitAccessLog) Update(ctx context.Context, p *savepb.GitAccessLog) error {
 	qn := "DBGitAccessLog_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set write=$1, userid=$2, r_timestamp=$3, sourcerepository=$4 where id = $5", a.get_Write(p), a.get_UserID(p), a.get_Timestamp(p), a.get_SourceRepository_ID(p), p.ID)
@@ -425,8 +439,11 @@ func (a *DBGitAccessLog) ByDBQuery(ctx context.Context, query *Query) ([]*savepb
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

@@ -51,6 +51,12 @@ type DBInternalGitHost struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBInternalGitHost()
+	})
+}
+
 func DefaultDBInternalGitHost() *DBInternalGitHost {
 	if default_def_DBInternalGitHost != nil {
 		return default_def_DBInternalGitHost
@@ -186,6 +192,14 @@ func (a *DBInternalGitHost) saveMap(ctx context.Context, queryname string, smap 
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBInternalGitHost) SaveOrUpdate(ctx context.Context, p *savepb.InternalGitHost) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBInternalGitHost) Update(ctx context.Context, p *savepb.InternalGitHost) error {
 	qn := "DBInternalGitHost_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set host=$1, expiry=$2 where id = $3", a.get_Host(p), a.get_Expiry(p), p.ID)
@@ -348,8 +362,11 @@ func (a *DBInternalGitHost) ByDBQuery(ctx context.Context, query *Query) ([]*sav
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

@@ -58,6 +58,12 @@ type DBCreateRepoLog struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBCreateRepoLog()
+	})
+}
+
 func DefaultDBCreateRepoLog() *DBCreateRepoLog {
 	if default_def_DBCreateRepoLog != nil {
 		return default_def_DBCreateRepoLog
@@ -200,6 +206,14 @@ func (a *DBCreateRepoLog) saveMap(ctx context.Context, queryname string, smap ma
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBCreateRepoLog) SaveOrUpdate(ctx context.Context, p *savepb.CreateRepoLog) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBCreateRepoLog) Update(ctx context.Context, p *savepb.CreateRepoLog) error {
 	qn := "DBCreateRepoLog_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, userid=$2, context=$3, action=$4, success=$5, errormessage=$6, started=$7, finished=$8, associationtoken=$9 where id = $10", a.get_RepositoryID(p), a.get_UserID(p), a.get_Context(p), a.get_Action(p), a.get_Success(p), a.get_ErrorMessage(p), a.get_Started(p), a.get_Finished(p), a.get_AssociationToken(p), p.ID)
@@ -607,8 +621,11 @@ func (a *DBCreateRepoLog) ByDBQuery(ctx context.Context, query *Query) ([]*savep
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

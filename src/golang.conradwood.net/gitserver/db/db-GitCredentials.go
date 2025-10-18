@@ -55,6 +55,12 @@ type DBGitCredentials struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBGitCredentials()
+	})
+}
+
 func DefaultDBGitCredentials() *DBGitCredentials {
 	if default_def_DBGitCredentials != nil {
 		return default_def_DBGitCredentials
@@ -194,6 +200,14 @@ func (a *DBGitCredentials) saveMap(ctx context.Context, queryname string, smap m
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBGitCredentials) SaveOrUpdate(ctx context.Context, p *savepb.GitCredentials) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBGitCredentials) Update(ctx context.Context, p *savepb.GitCredentials) error {
 	qn := "DBGitCredentials_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set userid=$1, host=$2, path=$3, username=$4, password=$5, expiry=$6 where id = $7", a.get_UserID(p), a.get_Host(p), a.get_Path(p), a.get_Username(p), a.get_Password(p), a.get_Expiry(p), p.ID)
@@ -496,8 +510,11 @@ func (a *DBGitCredentials) ByDBQuery(ctx context.Context, query *Query) ([]*save
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

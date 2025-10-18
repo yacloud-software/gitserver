@@ -56,6 +56,12 @@ type DBBuild struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBBuild()
+	})
+}
+
 func DefaultDBBuild() *DBBuild {
 	if default_def_DBBuild != nil {
 		return default_def_DBBuild
@@ -196,6 +202,14 @@ func (a *DBBuild) saveMap(ctx context.Context, queryname string, smap map[string
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBBuild) SaveOrUpdate(ctx context.Context, p *savepb.Build) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBBuild) Update(ctx context.Context, p *savepb.Build) error {
 	qn := "DBBuild_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, commithash=$2, branch=$3, logmessage=$4, userid=$5, r_timestamp=$6, success=$7 where id = $8", a.get_RepositoryID(p), a.get_CommitHash(p), a.get_Branch(p), a.get_LogMessage(p), a.get_UserID(p), a.get_Timestamp(p), a.get_Success(p), p.ID)
@@ -533,8 +547,11 @@ func (a *DBBuild) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.Build,
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

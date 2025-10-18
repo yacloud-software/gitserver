@@ -3,13 +3,17 @@ package query
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"golang.conradwood.net/apis/buildrepo"
+
+	"golang.conradwood.net/apis/common"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/http"
 	"golang.conradwood.net/go-easyops/sql"
 	"golang.conradwood.net/go-easyops/utils"
-	"time"
 )
 
 var (
@@ -57,7 +61,19 @@ func Ping(h PingResponder) {
 		h.Error(fmt.Errorf("invalid associationtoken"))
 		return
 	}
-	ps := dbs[0]
+
+	ps := &gitpb.PingResponse{
+		PingState: dbs[0],
+	}
+
+	bi, err := buildrepo.GetBuildRepoManagerClient().GetManagerInfo(ctx, &common.Void{})
+	if err != nil {
+		fmt.Printf("ping response error: %s\n", utils.ErrorString(err))
+		h.Error(fmt.Errorf("unable to get build domain"))
+	} else {
+		ps.DefaultBuildDomain = bi.Domain
+	}
+
 	s, err := utils.MarshalBytes(ps)
 	if err != nil {
 		h.Error(fmt.Errorf("unable to marshal pingstate"))
@@ -67,7 +83,7 @@ func Ping(h PingResponder) {
 }
 
 // send a ping
-func SendPing(ctx context.Context, host string) (*gitpb.PingState, bool, error) {
+func SendPing(ctx context.Context, host string) (*gitpb.PingResponse, bool, error) {
 	err := startup()
 	if err != nil {
 		return nil, false, err
@@ -99,12 +115,13 @@ func SendPing(ctx context.Context, host string) (*gitpb.PingState, bool, error) 
 		fmt.Printf("Ping code from url %s: %d\n", url, hb.HTTPCode())
 		return nil, false, err
 	}
-	psr := &gitpb.PingState{}
-	err = utils.UnmarshalBytes(hb.Body(), psr)
+	pr := &gitpb.PingResponse{}
+	err = utils.UnmarshalBytes(hb.Body(), pr)
 	if err != nil {
 		fmt.Printf("weird proto received from url %s\n", url)
 		return nil, false, err
 	}
+	psr := pr.PingState
 
 	v := ps.ResponseToken == psr.ResponseToken
 	if !v {
@@ -113,11 +130,8 @@ func SendPing(ctx context.Context, host string) (*gitpb.PingState, bool, error) 
 	}
 	fmt.Printf("Returned pingstate id: %d, created id: %d (token match: %v)\n", psr.ID, ps.ID, v)
 	if psr.ID == ps.ID && ps.ResponseToken == psr.ResponseToken {
-		return ps, true, nil
+		return pr, true, nil
 	} else {
-		return ps, false, nil
+		return pr, false, nil
 	}
 }
-
-
-

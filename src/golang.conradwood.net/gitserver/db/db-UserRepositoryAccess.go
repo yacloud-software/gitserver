@@ -53,6 +53,12 @@ type DBUserRepositoryAccess struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBUserRepositoryAccess()
+	})
+}
+
 func DefaultDBUserRepositoryAccess() *DBUserRepositoryAccess {
 	if default_def_DBUserRepositoryAccess != nil {
 		return default_def_DBUserRepositoryAccess
@@ -190,6 +196,14 @@ func (a *DBUserRepositoryAccess) saveMap(ctx context.Context, queryname string, 
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBUserRepositoryAccess) SaveOrUpdate(ctx context.Context, p *savepb.UserRepositoryAccess) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBUserRepositoryAccess) Update(ctx context.Context, p *savepb.UserRepositoryAccess) error {
 	qn := "DBUserRepositoryAccess_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repoid=$1, userid=$2, read=$3, write=$4 where id = $5", a.get_RepoID(p), a.get_UserID(p), a.get_Read(p), a.get_Write(p), p.ID)
@@ -422,8 +436,11 @@ func (a *DBUserRepositoryAccess) ByDBQuery(ctx context.Context, query *Query) ([
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

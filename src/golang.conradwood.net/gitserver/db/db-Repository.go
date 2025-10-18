@@ -52,6 +52,12 @@ type DBRepository struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBRepository()
+	})
+}
+
 func DefaultDBRepository() *DBRepository {
 	if default_def_DBRepository != nil {
 		return default_def_DBRepository
@@ -188,6 +194,14 @@ func (a *DBRepository) saveMap(ctx context.Context, queryname string, smap map[s
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBRepository) SaveOrUpdate(ctx context.Context, p *savepb.Repository) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBRepository) Update(ctx context.Context, p *savepb.Repository) error {
 	qn := "DBRepository_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set reponame=$1, ownerid=$2, artefactname=$3 where id = $4", a.get_RepoName(p), a.get_OwnerID(p), a.get_ArtefactName(p), p.ID)
@@ -385,8 +399,11 @@ func (a *DBRepository) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.R
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

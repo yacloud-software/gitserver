@@ -1,21 +1,19 @@
 module golang.conradwood.net/gitserver
 
-go 1.23.0
-
-toolchain go1.23.3
+go 1.24.0
 
 require (
 	golang.conradwood.net/apis/artefact v1.1.4021
-	golang.conradwood.net/apis/auth v1.1.4067
+	golang.conradwood.net/apis/auth v1.1.4102
 	golang.conradwood.net/apis/buildrepo v1.1.4021
-	golang.conradwood.net/apis/common v1.1.4067
+	golang.conradwood.net/apis/common v1.1.4102
 	golang.conradwood.net/apis/gitbuilder v1.1.4021
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.4021
 	golang.conradwood.net/apis/slackgateway v1.1.4021
 	golang.conradwood.net/go-easyops v0.1.37697
-	golang.org/x/sys v0.35.0
-	google.golang.org/grpc v1.75.0
+	golang.org/x/sys v0.36.0
+	google.golang.org/grpc v1.75.1
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -44,8 +42,8 @@ require (
 	golang.conradwood.net/apis/h2gproxy v1.1.4021 // indirect
 	golang.conradwood.net/apis/objectstore v1.1.4021 // indirect
 	golang.conradwood.net/apis/registry v1.1.4021 // indirect
-	golang.org/x/net v0.43.0 // indirect
-	golang.org/x/text v0.28.0 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/text v0.29.0 // indirect
 	golang.yacloud.eu/apis/autodeployer2 v1.1.4021 // indirect
 	golang.yacloud.eu/apis/faultindicator v1.1.4021 // indirect
 	golang.yacloud.eu/apis/fscache v1.1.4021 // indirect

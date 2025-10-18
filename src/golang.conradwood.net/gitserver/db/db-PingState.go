@@ -52,6 +52,12 @@ type DBPingState struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBPingState()
+	})
+}
+
 func DefaultDBPingState() *DBPingState {
 	if default_def_DBPingState != nil {
 		return default_def_DBPingState
@@ -188,6 +194,14 @@ func (a *DBPingState) saveMap(ctx context.Context, queryname string, smap map[st
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBPingState) SaveOrUpdate(ctx context.Context, p *savepb.PingState) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBPingState) Update(ctx context.Context, p *savepb.PingState) error {
 	qn := "DBPingState_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set associationtoken=$1, created=$2, responsetoken=$3 where id = $4", a.get_AssociationToken(p), a.get_Created(p), a.get_ResponseToken(p), p.ID)
@@ -385,8 +399,11 @@ func (a *DBPingState) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.Pi
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

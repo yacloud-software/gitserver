@@ -69,6 +69,12 @@ type DBSourceRepository struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBSourceRepository()
+	})
+}
+
 func DefaultDBSourceRepository() *DBSourceRepository {
 	if default_def_DBSourceRepository != nil {
 		return default_def_DBSourceRepository
@@ -222,6 +228,14 @@ func (a *DBSourceRepository) saveMap(ctx context.Context, queryname string, smap
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBSourceRepository) SaveOrUpdate(ctx context.Context, p *savepb.SourceRepository) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBSourceRepository) Update(ctx context.Context, p *savepb.SourceRepository) error {
 	qn := "DBSourceRepository_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set filepath=$1, artefactname=$2, runpostreceive=$3, runprereceive=$4, createdcomplete=$5, description=$6, usercommits=$7, deleted=$8, deletedtimestamp=$9, deleteuser=$10, lastcommit=$11, lastcommituser=$12, tags=$13, forking=$14, forkedfrom=$15, buildroutingtagname=$16, buildroutingtagvalue=$17, readonly=$18, createuser=$19, denymessage=$20 where id = $21", a.get_FilePath(p), a.get_ArtefactName(p), a.get_RunPostReceive(p), a.get_RunPreReceive(p), a.get_CreatedComplete(p), a.get_Description(p), a.get_UserCommits(p), a.get_Deleted(p), a.get_DeletedTimestamp(p), a.get_DeleteUser(p), a.get_LastCommit(p), a.get_LastCommitUser(p), a.get_Tags(p), a.get_Forking(p), a.get_ForkedFrom(p), a.get_BuildRoutingTagName(p), a.get_BuildRoutingTagValue(p), a.get_ReadOnly(p), a.get_CreateUser(p), a.get_DenyMessage(p), p.ID)
@@ -1014,8 +1028,11 @@ func (a *DBSourceRepository) ByDBQuery(ctx context.Context, query *Query) ([]*sa
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()

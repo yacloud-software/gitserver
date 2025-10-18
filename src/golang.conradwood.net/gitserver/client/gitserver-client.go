@@ -320,7 +320,7 @@ func printDesc() error {
 		return err
 	}
 	s := strings.TrimSuffix(sr.Description, "\n") + "\n"
-	fmt.Printf(s)
+	fmt.Print(s)
 	return nil
 }
 func denyMsg() error {

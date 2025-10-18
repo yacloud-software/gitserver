@@ -52,6 +52,12 @@ type DBNRepoTagID struct {
 	lock                 sync.Mutex
 }
 
+func init() {
+	RegisterDBHandlerFactory(func() Handler {
+		return DefaultDBNRepoTagID()
+	})
+}
+
 func DefaultDBNRepoTagID() *DBNRepoTagID {
 	if default_def_DBNRepoTagID != nil {
 		return default_def_DBNRepoTagID
@@ -188,6 +194,14 @@ func (a *DBNRepoTagID) saveMap(ctx context.Context, queryname string, smap map[s
 	return id, nil
 }
 
+// if ID==0 save, otherwise update
+func (a *DBNRepoTagID) SaveOrUpdate(ctx context.Context, p *savepb.NRepoTagID) error {
+	if p.ID == 0 {
+		_, err := a.Save(ctx, p)
+		return err
+	}
+	return a.Update(ctx, p)
+}
 func (a *DBNRepoTagID) Update(ctx context.Context, p *savepb.NRepoTagID) error {
 	qn := "DBNRepoTagID_Update"
 	_, e := a.DB.ExecContext(ctx, qn, "update "+a.SQLTablename+" set repositoryid=$1, tag=$2, buildid=$3 where id = $4", a.get_RepositoryID(p), a.get_Tag(p), a.get_BuildID(p), p.ID)
@@ -385,8 +399,11 @@ func (a *DBNRepoTagID) ByDBQuery(ctx context.Context, query *Query) ([]*savepb.N
 	i := 0
 	for col_name, value := range extra_fields {
 		i++
-		efname := fmt.Sprintf("EXTRA_FIELD_%d", i)
-		query.Add(col_name+" = "+efname, QP{efname: value})
+		/*
+		   efname:=fmt.Sprintf("EXTRA_FIELD_%d",i)
+		   query.Add(col_name+" = "+efname,QP{efname:value})
+		*/
+		query.AddEqual(col_name, value)
 	}
 
 	gw, paras := query.ToPostgres()
