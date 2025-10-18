@@ -233,6 +233,12 @@ message ForkRequest {
   string Description =4;
   bool CreateReadOnly = 5; // if true, create the fork as readonly (intention: a repobuilder can patch it without user commit conflicts)
 }
+
+message PingResponse {
+  PingState PingState=1;
+  string DefaultBuildDomain=2;
+}
+
 message PingState {
   uint64 ID=1;
   string AssociationToken=2; // sent to the server
