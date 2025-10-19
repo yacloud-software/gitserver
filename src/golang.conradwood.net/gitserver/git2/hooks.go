@@ -3,11 +3,13 @@ package git2
 import (
 	"flag"
 	"fmt"
+
 	//	"golang.conradwood.net/go-easyops/cmdline"
-	"golang.conradwood.net/go-easyops/utils"
-	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"strings"
+
+	"golang.conradwood.net/go-easyops/utils"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -16,6 +18,14 @@ var (
 
 // install githoooks. called on each request (so we always use up-to-date hooks)
 func (h *HTTPRequest) fixHooks() error {
+	// always on hooks
+	always_hooks := []string{"pre-receive", "commit-msg", "post-receive", "post-update", "sendemail-validate"}
+	for _, hookname := range always_hooks {
+		err := h.writeHook(true, hookname)
+		if err != nil {
+			return err
+		}
+	}
 	err := h.writeHook(h.repo.gitrepo.RunPostReceive, "post-receive")
 	if err != nil {
 		return err
@@ -76,6 +86,3 @@ func (h *HTTPRequest) writeHook(enable bool, name string) error {
 	}
 	return nil
 }
-
-
-

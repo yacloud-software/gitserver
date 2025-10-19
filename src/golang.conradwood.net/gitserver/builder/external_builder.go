@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"time"
+
 	"golang.conradwood.net/apis/gitbuilder"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/artefacts"
@@ -12,8 +15,6 @@ import (
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/errors"
 	"golang.conradwood.net/go-easyops/sql"
-	"io"
-	"time"
 )
 
 var (
@@ -211,6 +212,8 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 	} else if lastResponse != nil {
 		nb.Success = lastResponse.Success
 		nb.LogMessage = lastResponse.LogMessage
+		fmt.Printf("Gitbuilder success: %v\n", nb.Success)
+		fmt.Printf("Gitbuilder logmessage:\n%s\n", nb.LogMessage)
 		err := bdb.Update(ctx, nb)
 		if err != nil {
 			fmt.Printf("Failed to set logmessage: %s\n", err)
@@ -222,6 +225,3 @@ func external_builder(ctx context.Context, gt ExternalGitTrigger, w io.Writer) e
 	}
 	return nil
 }
-
-
-

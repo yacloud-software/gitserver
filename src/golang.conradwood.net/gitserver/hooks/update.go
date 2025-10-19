@@ -3,14 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	gitpb "golang.conradwood.net/apis/gitserver"
-	"golang.conradwood.net/go-easyops/client"
-	"golang.conradwood.net/go-easyops/linux"
-	"gopkg.in/yaml.v2"
-	"io"
 	"os"
 	"strings"
 	"time"
+
+	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/linux"
+	"gopkg.in/yaml.v2"
 )
 
 /*
@@ -61,40 +60,16 @@ func (u *Update) Process(e *Environment) error {
 	// connect to local gitserver and execute within gitserver process space
 	// see readme.txt
 	if CALL_GITSERVER {
-		gip := "localhost:" + os.Getenv("GITSERVER_GRPC_PORT")
-		fmt.Printf("grpc connection to \"%s\"\n", gip)
-		con, err := client.ConnectWithIP(gip)
-		if err != nil {
-			return err
-		}
-		gc := gitpb.NewGIT2Client(con)
-		srv, err := gc.RunLocalHook(e.ctx, &gitpb.HookRequest{
+		req := &gitpb.HookRequest{
 			RequestKey: os.Getenv("GITSERVER_KEY"),
 			NewRev:     u.newrev,
 			OldRev:     u.oldrev,
 			HookName:   "update",
-		})
+		}
+		err := call_gitserver(req)
 		if err != nil {
 			return err
 		}
-		for {
-			hr, err := srv.Recv()
-			if hr != nil {
-				if hr.Output != "" {
-					fmt.Print(hr.Output)
-				}
-				if hr.ErrorMessage != "" {
-					return fmt.Errorf("%s", hr.ErrorMessage)
-				}
-			}
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return err
-			}
-		}
-		return nil
 	}
 
 	err := u.ChangedFileNames()
@@ -238,6 +213,3 @@ func exe(com string) (string, error) {
 	}
 	return out, nil
 }
-
-
-

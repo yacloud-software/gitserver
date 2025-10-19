@@ -2,6 +2,7 @@ package git2
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/url"
 	"sort"
@@ -29,6 +30,7 @@ var (
 	// these repos may be 'reset' back to 'bare' at any time
 	RESETTABLE_REPOS = []uint64{216}
 	urlCache         = cache.NewResolvingCache("giturlcache", time.Duration(15)*time.Minute, 1000)
+	debug_githook    = flag.Bool("debug_githook", false, "debug print server side githook stuff")
 )
 
 type GIT2 struct {
@@ -572,10 +574,15 @@ func checkValidHost(ctx context.Context, host string) error {
 	return nil
 }
 
-// see readme.txt
+/*
+ see readme.txt - this is called by the hook on the server
+ gitclient->http->git-cgi.go->git-http-backend->hook->grpc.Connect("localhost").RunLocalHook(...)
+*/
+
 func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookServer) error {
 	ld := crossprocdata.GetLocalData(req.RequestKey)
 	if ld == nil {
+		fmt.Printf("failed. no crossdata\n")
 		return errors.Errorf("attempt to invoke hook failed, invalid or missing requestkey from gitprocess")
 	}
 	hr := ld.HTTPRequest.(*HTTPRequest)
@@ -585,8 +592,12 @@ func (g *GIT2) RunLocalHook(req *gitpb.HookRequest, srv gitpb.GIT2_RunLocalHookS
 	var err error
 	if req.HookName == "update" {
 		err = ch.OnUpdate(srv)
+	} else if req.HookName == "post-update" {
+		print_cross_proc_data(req, ld)
 	} else {
-		err = errors.Errorf("unknown hook \"%s\"", req.HookName)
+		print_cross_proc_data(req, ld)
+		fmt.Printf("Serverprocess-space hook \"%s\" ignored for repo #%d \"%s\"\n", req.HookName, hr.repo.gitrepo.ID, hr.repo.AbsDirectory())
+		return nil
 	}
 	if err != nil {
 		fmt.Printf("Hook \"%s\" failed: %s\n", req.HookName, err)
@@ -690,4 +701,17 @@ func (g *GIT2) GetNumberCommitsUser(ctx context.Context, req *gitpb.NumberCommit
 		val++
 	}
 	return &gitpb.NumberCommitsUserResponse{Commits: val}, nil
+}
+func print_cross_proc_data(req *gitpb.HookRequest, ld *crossprocdata.LocalData) {
+	if !*debug_githook {
+		return
+	}
+	fmt.Printf("Args:\n")
+	for _, a := range req.Args {
+		fmt.Printf("   Arg: \"%s\"\n", a)
+	}
+	fmt.Printf("Environment:\n")
+	for _, a := range req.Environment {
+		fmt.Printf("   Env: \"%s\"\n", a)
+	}
 }

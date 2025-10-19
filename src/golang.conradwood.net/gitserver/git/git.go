@@ -31,7 +31,7 @@ type Git struct {
 	LogMessage string
 }
 
-func GitRepo(url string) *Git {
+func disabled_GitRepo(url string) *Git {
 	basedir = "./temp"
 	if *git_dir == "." {
 		bdir, err := os.Getwd()

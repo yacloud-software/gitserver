@@ -2,19 +2,19 @@ package builder
 
 import (
 	"context"
+
 	"golang.conradwood.net/gitserver/coderunners"
 	"golang.conradwood.net/gitserver/coderunners/registry"
+
 	//	"encoding/base64"
 	"fmt"
+
 	am "golang.conradwood.net/apis/auth"
 	gitpb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
 	"golang.conradwood.net/gitserver/git"
+
 	//"golang.conradwood.net/gitserver/git2"
-	"golang.conradwood.net/go-easyops/auth"
-	"golang.conradwood.net/go-easyops/authremote"
-	"golang.conradwood.net/go-easyops/sql"
-	"golang.conradwood.net/go-easyops/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -22,6 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.conradwood.net/go-easyops/auth"
+	"golang.conradwood.net/go-easyops/authremote"
+	"golang.conradwood.net/go-easyops/errors"
+	"golang.conradwood.net/go-easyops/sql"
+	"golang.conradwood.net/go-easyops/utils"
 )
 
 /*
@@ -194,6 +200,9 @@ func (b *Builder) readBuildrules() error {
 	return nil
 }
 func (b *Builder) BuildGit(ctx context.Context) error {
+	return errors.Errorf("local builds no longer supported")
+}
+func (b *Builder) OLDBuildGit(ctx context.Context) error {
 	var err error
 	b.db, err = sql.Open()
 	if err != nil {
@@ -520,6 +529,3 @@ func (b *Builder) updateBuild() error {
 
 	return nil
 }
-
-
-

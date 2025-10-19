@@ -8,11 +8,13 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"golang.conradwood.net/go-easyops/utils"
 	"net"
+
+	"golang.conradwood.net/go-easyops/utils"
 )
 
 var (
+	run_build   = flag.Bool("trigger_builds", true, "if false do not build stuff at all")
 	run_scripts = flag.Bool("run_scripts", true, "if false, no automatic builds and checks will be created")
 )
 
@@ -35,7 +37,7 @@ func (t *TCPConn) Write(s []byte) (int, error) {
 }
 func (t *TCPConn) HandleConnection() {
 	defer t.conn.Close()
-	fmt.Printf("received git request\n")
+	fmt.Printf("received incoming tcp connection\n")
 	t.Writeln("building git repository...")
 	r := bufio.NewReader(t.conn)
 	line, err := r.ReadString('\n')
@@ -56,7 +58,12 @@ func (t *TCPConn) HandleConnection() {
 	if !*run_scripts {
 		t.Writeln("Builds disabled.\n")
 	} else {
-		err = external_builder(ctx, gt, t)
+		if *run_build {
+			err = external_builder(ctx, gt, t)
+		} else {
+			fmt.Printf("Trigger:\n%#v\n", gt)
+			t.Writeln("Builds disabled.\n")
+		}
 	}
 	if err != nil {
 		t.Writeln(fmt.Sprintf("Failed to build: %s", err))
@@ -68,6 +75,3 @@ func (t *TCPConn) Printf(format string, a ...interface{}) {
 	t.conn.Write([]byte(msg))
 	fmt.Print("[hook] " + msg)
 }
-
-
-

@@ -6,8 +6,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"golang.conradwood.net/go-easyops/utils"
 	"os"
+
+	gitpb "golang.conradwood.net/apis/gitserver"
+	"golang.conradwood.net/go-easyops/utils"
 )
 
 var (
@@ -30,8 +32,14 @@ func main() {
 		postreceive := PostReceive{}
 		err = postreceive.Process(ev)
 	} else {
-		fmt.Printf("Hook not supported: \"%s\"\n", *hook_type)
-		os.Exit(10)
+		req := &gitpb.HookRequest{
+			RequestKey: os.Getenv("GITSERVER_KEY"),
+			NewRev:     "-",
+			OldRev:     "-",
+			HookName:   *hook_type,
+		}
+		err := call_gitserver(req)
+		utils.Bail(fmt.Sprintf("failed to run hook \"%s\"", *hook_type), err)
 	}
 	//		fmt.Fprintf(os.Stderr, "=== Git Hook Finished: \"%s\"\n", *hook_type)
 	if err != nil {
@@ -41,6 +49,3 @@ func main() {
 	utils.Bail(fmt.Sprintf("hook \"%s\" failed", *hook_type), err)
 
 }
-
-
-

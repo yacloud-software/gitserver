@@ -3,13 +3,16 @@ package builder
 import (
 	"context"
 	"fmt"
+
 	pb "golang.conradwood.net/apis/gitserver"
 	"golang.conradwood.net/gitserver/db"
+
 	//	"golang.conradwood.net/go-easyops/auth"
+	"strings"
+
 	"golang.conradwood.net/gitserver/artefacts"
 	"golang.conradwood.net/go-easyops/authremote"
 	"golang.conradwood.net/go-easyops/utils"
-	"strings"
 )
 
 /*
@@ -95,6 +98,3 @@ func (g *GitTrigger) ArtefactID() uint64 {
 func (g *GitTrigger) RepositoryID() uint64 {
 	return g.gitinfo.RepositoryID
 }
-
-
-

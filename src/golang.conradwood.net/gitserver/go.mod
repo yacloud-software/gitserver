@@ -4,14 +4,14 @@ go 1.24.0
 
 require (
 	golang.conradwood.net/apis/artefact v1.1.4021
-	golang.conradwood.net/apis/auth v1.1.4102
+	golang.conradwood.net/apis/auth v1.1.4115
 	golang.conradwood.net/apis/buildrepo v1.1.4021
-	golang.conradwood.net/apis/common v1.1.4102
+	golang.conradwood.net/apis/common v1.1.4115
 	golang.conradwood.net/apis/gitbuilder v1.1.4021
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.4021
 	golang.conradwood.net/apis/slackgateway v1.1.4021
-	golang.conradwood.net/go-easyops v0.1.37697
+	golang.conradwood.net/go-easyops v0.1.38116
 	golang.org/x/sys v0.36.0
 	google.golang.org/grpc v1.75.1
 	gopkg.in/yaml.v2 v2.4.0
