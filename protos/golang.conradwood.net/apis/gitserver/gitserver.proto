@@ -272,7 +272,9 @@ message HookRequest {
   string RequestKey=1; // the localprocess data key
   string NewRev=2; // revision to run hook against
   string OldRev=3; // revision from which we upgrade
-  string HookName=4; // git-names, e.g. "update" 
+  string HookName=4; // git-names, e.g. "update"
+  repeated string Environment=5; // environment when the hook was invoked
+  repeated string Args=6; // arguments with which the hook was invoked
 }
 
 message HookResponse {
