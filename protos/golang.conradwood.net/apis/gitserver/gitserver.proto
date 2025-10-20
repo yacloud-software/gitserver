@@ -393,6 +393,8 @@ service GIT2 {
   rpc AttachNTagToBuild(AttachNTagRequest)returns(common.Void);
   // rpc get build for n-tag
   rpc GetBuildWithNTag(GetNTagRequest)returns(NTagResponse);
+  // get a repo by id
+  rpc GetRepoByID(ByIDRequest)returns (SourceRepository);
 }
 
 
