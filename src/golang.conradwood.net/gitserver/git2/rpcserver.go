@@ -109,6 +109,22 @@ func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Sou
 	return repo, nil
 }
 
+func (g *GIT2) GetRepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
+	res, err := db.DefaultDBSourceRepository().ByID(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	err = wantRepoAccess(ctx, res, false)
+	if err != nil {
+		return nil, err
+	}
+	urls, err := db.DefaultDBSourceRepositoryURL().ByV2RepositoryID(ctx, res.ID)
+	if err != nil {
+		return nil, err
+	}
+	res.URLs = urls
+	return res, nil
+}
 func (g *GIT2) GetRepos(ctx context.Context, req *common.Void) (*gitpb.SourceRepositoryList, error) {
 	return g.GetReposWithFilter(ctx, &gitpb.RepoFilter{})
 }
