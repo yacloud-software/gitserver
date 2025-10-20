@@ -50,12 +50,12 @@ go.opentelemetry.io/otel/trace v1.37.0 h1:HLdcFNbRQBE2imdSEgm/kwqmQj1Or1l/7bW6mx
 go.opentelemetry.io/otel/trace v1.37.0/go.mod h1:TlgrlQ+PtQO5XFerSPUYG0JSgGyryXewPGyayAWSBS0=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=
 go.uber.org/goleak v1.3.0/go.mod h1:CoHD4mav9JJNrW/WLlf7HGZPjdw8EucARQHekz1X6bE=
-golang.conradwood.net/apis/auth v1.1.4135 h1:PizViSHN9ibNJzt4XW0eTixMlSWSm+S5bL8vSLbN4Lk=
-golang.conradwood.net/apis/auth v1.1.4135/go.mod h1:UwemjG6uSsIfbO8/DX2Jpu0dIE9G5CDNQwC6iy9Xmm4=
+golang.conradwood.net/apis/auth v1.1.4137 h1:jI9rES5TfIWj6KEgrMt3b/a7w8Axev3j1QggTpDDn6g=
+golang.conradwood.net/apis/auth v1.1.4137/go.mod h1:C0VIGLbNvuFsfDTZPFrCKu6x5cAg0lH5H+KVeXXgsS8=
 golang.conradwood.net/apis/autodeployer v1.1.4021 h1:8/ubL7/lpkyHK13uCaRumBCnN1I9k0gup52c3yuIFjc=
 golang.conradwood.net/apis/autodeployer v1.1.4021/go.mod h1:HRfesbY+3wD3X97GoqmR2EWo5I1WWsKp85x24n261Ps=
-golang.conradwood.net/apis/common v1.1.4135 h1:CfDNe8neVPe/cJEvHsLH8DctlJTtM6K8jzQTL8WpMJ8=
-golang.conradwood.net/apis/common v1.1.4135/go.mod h1:bWgHxsFMxE2MQEBTAAWjG1EUudgWFSQWHAinS3AF+oQ=
+golang.conradwood.net/apis/common v1.1.4137 h1:ZK9r+ohV0GWUkxtZn3FZ9ei69a6/Zp6QtWlbCdPMIuY=
+golang.conradwood.net/apis/common v1.1.4137/go.mod h1:Ip/McSIhHfPxg8qZ98KSx78MheHqHcgqB7jXG0TbQR8=
 golang.conradwood.net/apis/deploymonkey v1.1.4021 h1:aA27B7dKEF3yWyy7EQs53487aTgaaRo5F1PaAKAXDcw=
 golang.conradwood.net/apis/deploymonkey v1.1.4021/go.mod h1:pFLC/rgPOGmkxDdmuH9fNn39qMFK01NOTyn6ZerPDTA=
 golang.conradwood.net/apis/framework v1.1.4021 h1:8V2NTwrl26ThMsOSElZWaZmYTxuE9+jWLk1TDSpSWIM=

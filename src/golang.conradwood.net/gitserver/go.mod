@@ -4,9 +4,9 @@ go 1.24.0
 
 require (
 	golang.conradwood.net/apis/artefact v1.1.4021
-	golang.conradwood.net/apis/auth v1.1.4135
+	golang.conradwood.net/apis/auth v1.1.4137
 	golang.conradwood.net/apis/buildrepo v1.1.4021
-	golang.conradwood.net/apis/common v1.1.4135
+	golang.conradwood.net/apis/common v1.1.4137
 	golang.conradwood.net/apis/gitbuilder v1.1.4021
 	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.4021

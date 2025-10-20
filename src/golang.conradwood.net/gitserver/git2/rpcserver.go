@@ -109,6 +109,21 @@ func (g *GIT2) RepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Sou
 	return repo, nil
 }
 
+func (g *GIT2) GetBuildByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.Build, error) {
+	build, err := db.DefaultDBBuild().ByID(ctx, req.ID)
+	if err != nil {
+		return nil, err
+	}
+	repo, err := g.GetRepoByID(ctx, &gitpb.ByIDRequest{ID: build.RepositoryID})
+	if err != nil {
+		return nil, err
+	}
+	err = wantRepoAccess(ctx, repo, false)
+	if err != nil {
+		return nil, err
+	}
+	return build, nil
+}
 func (g *GIT2) GetRepoByID(ctx context.Context, req *gitpb.ByIDRequest) (*gitpb.SourceRepository, error) {
 	res, err := db.DefaultDBSourceRepository().ByID(ctx, req.ID)
 	if err != nil {
