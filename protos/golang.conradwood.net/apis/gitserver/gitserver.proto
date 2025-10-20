@@ -395,6 +395,8 @@ service GIT2 {
   rpc GetBuildWithNTag(GetNTagRequest)returns(NTagResponse);
   // get a repo by id
   rpc GetRepoByID(ByIDRequest)returns (SourceRepository);
+  // get a build by id
+  rpc GetBuildByID(ByIDRequest)returns (Build);
 }
 
 
