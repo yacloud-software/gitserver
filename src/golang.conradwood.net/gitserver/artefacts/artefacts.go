@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
+
 	af "golang.conradwood.net/apis/artefact"
 	br "golang.conradwood.net/apis/buildrepo"
 	"golang.conradwood.net/apis/common"
@@ -41,6 +43,16 @@ func CreateIfRequired(ctx context.Context, repo *gitpb.SourceRepository) (*af.Cr
 		return nil, err
 	}
 	car.BuildRepoDomain = bi.Domain
+
+	/*
+	   this is a bit dodgy.
+	   this should be resolved in one place and dynamically please.
+	*/
+	if strings.Contains(car.GitURL, "singingcat.net") {
+		car.BuildRepoDomain = "singingcat.net"
+	}
+
+	//	fmt.Printf("Create artefact: %#v\n", car)
 	afm, err := af.GetArtefactServiceClient().CreateArtefactIfRequired(ctx, car)
 	if err != nil {
 		return nil, err
@@ -69,6 +81,3 @@ func RepositoryIDToArtefactID(repo *gitpb.SourceRepository) (uint64, error) {
 	}
 	return afid.ID, nil
 }
-
-
-

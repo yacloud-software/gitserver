@@ -116,19 +116,19 @@ func main() {
 		fmt.Printf("%d repos, %d urls\n", len(rl.Repos), urlCounter)
 	}
 	if *getrepo {
-		showrepo()
+		utils.Bail("-info failed", showrepo())
 		os.Exit(0)
 	}
 	fmt.Printf("Done.\n")
 	os.Exit(0)
 }
-func showrepo() {
+func showrepo() error {
 	ctx := authremote.Context()
 	rl := GetRepository(ctx)
-	af, err := artefacts.RepositoryIDToArtefactID(rl)
+	af, aerr := artefacts.RepositoryIDToArtefactID(rl)
 	afs := "n/a"
-	if err != nil {
-		fmt.Printf("failed to get artefact id: %s\n", utils.ErrorString(err))
+	if aerr != nil {
+		fmt.Printf("failed to get artefact id: %s\n", utils.ErrorString(aerr))
 	} else {
 		afs = fmt.Sprintf("%d", af)
 	}
@@ -180,6 +180,8 @@ func showrepo() {
 		fmt.Printf("GITSERVER_LATEST_BUILD=%d\n", b.ID)
 		fmt.Printf("GITSERVER_LATEST_SUCCESSFUL_BUILD=%d\n", bs.ID)
 	}
+
+	return aerr
 }
 
 func Delete() {
