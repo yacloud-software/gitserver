@@ -48,4 +48,6 @@ func main() {
 	}
 	utils.Bail(fmt.Sprintf("hook \"%s\" failed", *hook_type), err)
 
+	fmt.Printf("[hook] === Git Hook finished \"%s\"\n", *hook_type)
+
 }
