@@ -8,7 +8,6 @@ require (
 	golang.conradwood.net/apis/buildrepo v1.1.4445
 	golang.conradwood.net/apis/common v1.1.4485
 	golang.conradwood.net/apis/gitbuilder v1.1.4445
-	golang.conradwood.net/apis/gitserver v1.1.1702
 	golang.conradwood.net/apis/objectauth v1.1.4445
 	golang.conradwood.net/apis/slackgateway v1.1.4445
 	golang.conradwood.net/go-easyops v0.1.39553

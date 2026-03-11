@@ -54,6 +54,7 @@ func (h *HTTPRequest) writeHook(enable bool, name string) error {
 			break
 		}
 	}
+	fmt.Printf("using git-hook at \"%s\"\n", hook_binary)
 	if hook_binary == "" {
 		for _, hb := range hook_binaries {
 			fmt.Printf("Possible Location: \"%s\"\n", hb)
