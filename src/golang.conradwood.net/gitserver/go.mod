@@ -11,7 +11,7 @@ require (
 	golang.conradwood.net/apis/gitserver v0.0.0-00010101000000-000000000000
 	golang.conradwood.net/apis/objectauth v1.1.4445
 	golang.conradwood.net/apis/slackgateway v1.1.4445
-	golang.conradwood.net/go-easyops v0.1.39832
+	golang.conradwood.net/go-easyops v0.1.39834
 	golang.org/x/sys v0.41.0
 	google.golang.org/grpc v1.79.1
 	gopkg.in/yaml.v2 v2.4.0
